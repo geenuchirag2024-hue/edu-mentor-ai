@@ -1,0 +1,6 @@
+{
+  "app": { "name": "Edu Mentor AI", "tagline": "મશીન લર્નિંગ માટે તમારો AI વૉઇસ મેન્ટર" },
+  "chat": { "placeholder": "મશીન લર્નિંગ વિશે પૂછો...", "send": "મોકલો", "thinking": "મેન્ટર વિચારી રહ્યો છે...", "listening": "સાંભળી રહ્યું છે...", "speaking": "બોલી રહ્યું છે..." },
+  "language": { "select": "ભાષા પસંદ કરો", "english": "અંગ્રેજી", "hindi": "હિન્દી", "tamil": "તમિલ", "telugu": "તેલુગુ", "kannada": "કન્નડ", "malayalam": "મલયાલમ", "bengali": "બંગાળી", "marathi": "મરાઠી", "gujarati": "ગુજરાતી" },
+  "mascot": { "greeting": "નમસ્તે! હું તમારો ML મેન્ટર છું.", "tip": "પૂછો: સુપરવાઇઝ્ડ લર્નિંગ શું છે?" }
+}

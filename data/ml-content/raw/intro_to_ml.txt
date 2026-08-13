@@ -1,0 +1,18 @@
+# Introduction to Machine Learning
+
+Machine learning is a subset of artificial intelligence where systems learn patterns from data without being explicitly programmed for every rule.
+
+## Supervised Learning
+Supervised learning uses labeled data. The model learns to map inputs to known outputs. Examples include linear regression for predicting house prices and logistic regression for email spam classification.
+
+## Unsupervised Learning
+Unsupervised learning finds hidden patterns in unlabeled data. K-means clustering groups similar data points. PCA reduces dimensionality while preserving variance.
+
+## Overfitting
+Overfitting occurs when a model memorizes training data including noise and fails on new data. Regularization, dropout, and more training data help prevent overfitting.
+
+## Gradient Descent
+Gradient descent is an optimization algorithm that iteratively adjusts model parameters to minimize a loss function. Learning rate controls step size.
+
+## Evaluation Metrics
+Classification models are evaluated using accuracy, precision, recall, and F1 score. The confusion matrix shows true positives, false positives, true negatives, and false negatives.

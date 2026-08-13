@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "Edu Mentor AI",
+    "tagline": "Your AI voice mentor for Machine Learning"
+  },
+  "chat": {
+    "placeholder": "Ask a question about Machine Learning...",
+    "send": "Send",
+    "thinking": "Mentor is thinking...",
+    "listening": "Listening...",
+    "speaking": "Speaking..."
+  },
+  "language": {
+    "select": "Select Language",
+    "english": "English",
+    "hindi": "Hindi",
+    "tamil": "Tamil",
+    "telugu": "Telugu",
+    "kannada": "Kannada",
+    "malayalam": "Malayalam",
+    "bengali": "Bengali",
+    "marathi": "Marathi",
+    "gujarati": "Gujarati"
+  },
+  "mascot": {
+    "greeting": "Hi! I'm your ML mentor. Ask me anything about Machine Learning!",
+    "tip": "Try asking: What is supervised learning?"
+  }
+}
