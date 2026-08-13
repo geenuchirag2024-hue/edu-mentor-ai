@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Edu Mentor AI
 
 **AI Driven Conversational Voice Agent for Scalable Automation**
@@ -95,3 +96,6 @@ python scripts/init_db.py
 ```bash
 pytest backend/tests -v
 ```
+=======
+# edu-mentor-ai
+>>>>>>> 4950d67d47ebe37a420c27bcfa4fae75f5953857
