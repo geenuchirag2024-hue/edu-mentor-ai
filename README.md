@@ -1,1 +1,0 @@
-# edu-mentor-ai
