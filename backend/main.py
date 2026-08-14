@@ -21,7 +21,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes import auth, chat, health, voice
+from backend.api.routes import auth, chat, health, tutor, voice
 from backend.config import get_settings
 
 settings = get_settings()
@@ -98,6 +98,7 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(voice.router)
 app.include_router(auth.router)
+app.include_router(tutor.router)
 
 
 @app.get("/")

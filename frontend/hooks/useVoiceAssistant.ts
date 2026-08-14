@@ -3,8 +3,10 @@
 import { useCallback, useRef, useState } from "react";
 import { streamChatMessage } from "@/services/chatService";
 import { sendVoiceQuery, synthesizeSpeech } from "@/services/voiceService";
+import { getLearnerId } from "@/services/learner";
 import type { ChatMessage } from "@/types/chat";
-import type { MascotState } from "@/types/voice";
+import type { TutorMode } from "@/types/tutor";
+import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -14,6 +16,7 @@ interface UseVoiceAssistantOptions {
   onStateChange?: (state: MascotState) => void;
   onAudioReady?: (base64: string) => void;
   onSpeakingChange?: (speaking: boolean) => void;
+  onCues?: (emotion?: MascotEmotion, gesture?: MascotGesture) => void;
 }
 
 export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
@@ -23,9 +26,15 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tutorMode, setTutorMode] = useState<TutorMode>("teacher");
+  const [hintLevel, setHintLevel] = useState(0);
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
+  const tutorModeRef = useRef(tutorMode);
+  tutorModeRef.current = tutorMode;
+  const hintLevelRef = useRef(hintLevel);
+  hintLevelRef.current = hintLevel;
 
   const setMascot = useCallback((state: MascotState) => {
     optionsRef.current.onStateChange?.(state);
@@ -108,7 +117,13 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
 
       try {
         await streamChatMessage(
-          { message: text, session_id: sessionId },
+          {
+            message: text,
+            session_id: sessionId,
+            tutor_mode: tutorModeRef.current,
+            hint_level: hintLevelRef.current,
+            learner_id: getLearnerId(),
+          },
           {
             onToken: (token) => {
               fullAnswer += token;
@@ -124,6 +139,10 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
                 prev.map((m) =>
                   m.id === assistantId ? { ...m, sources: meta.sources } : m
                 )
+              );
+              optionsRef.current.onCues?.(
+                meta.emotion as MascotEmotion | undefined,
+                meta.gesture as MascotGesture | undefined
               );
             },
           }
@@ -170,7 +189,10 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
 
       try {
         setStatusMessage("Generating answer...");
-        const res = await sendVoiceQuery(audioBlob, sessionId);
+        const res = await sendVoiceQuery(audioBlob, sessionId, {
+          tutor_mode: tutorModeRef.current,
+          learner_id: getLearnerId(),
+        });
         setSessionId(res.session_id);
 
         setMessages((prev) => {
@@ -198,6 +220,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
           setIsSpeaking(true);
           optionsRef.current.onSpeakingChange?.(true);
           setMascot("speaking");
+          optionsRef.current.onCues?.(res.emotion, res.gesture);
           optionsRef.current.onAudioReady?.(res.audio_base64);
         } else {
           setMascot("idle");
@@ -221,6 +244,10 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     isSpeaking,
     statusMessage,
     error,
+    tutorMode,
+    setTutorMode,
+    hintLevel,
+    setHintLevel,
     sendText,
     sendVoice,
     startListening,

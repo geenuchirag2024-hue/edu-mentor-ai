@@ -1,39 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
-import type { MascotState } from "@/types/voice";
+import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
 import MentorFace, { type MentorFaceHandle } from "./MentorFace";
 import MascotStatusRing from "./MascotStatusRing";
-import { STATE_LABELS, type FacialPose } from "./mascotExpressions";
+import {
+  EMOTION_LABELS,
+  STATE_LABELS,
+  type FacialPose,
+} from "./mascotExpressions";
 import { useLipSync } from "./useLipSync";
 import { useMascotAnimation } from "./useMascotAnimation";
 
 interface MascotAvatarProps {
-  /** Conversation state from the existing voice pipeline. */
   state: MascotState;
-  /**
-   * Shared ref written by AudioPlayer's analyser each frame.
-   * Preferred over `audioLevel` — avoids React re-renders for lip-sync.
-   */
+  emotion?: MascotEmotion;
+  gesture?: MascotGesture;
   audioLevelRef?: MutableRefObject<number>;
-  /** Fallback amplitude 0–1 when a ref is not provided. */
   audioLevel?: number;
-  /** Compact layout for mobile header strip. */
   compact?: boolean;
-  /** Show name / status caption under the face. */
   showLabel?: boolean;
   className?: string;
 }
 
-/**
- * Production mascot shell for Edu-Mentor AI.
- *
- * Integrates with the existing idle → listening → thinking → speaking
- * state machine without changing any backend APIs. Lip-sync is driven by
- * amplitude samples from the frontend AudioPlayer analyser.
- */
 export default function MascotAvatar({
   state,
+  emotion = "neutral",
+  gesture = "none",
   audioLevelRef,
   audioLevel = 0,
   compact = false,
@@ -45,7 +38,6 @@ export default function MascotAvatar({
   const localLevelRef = useRef(0);
   const wasSpeakingRef = useRef(false);
 
-  // Mirror prop-based level when a shared ref is not used
   useEffect(() => {
     if (!audioLevelRef) {
       localLevelRef.current = audioLevel;
@@ -72,16 +64,21 @@ export default function MascotAvatar({
     faceRef.current?.applyPose(pose);
   }, []);
 
-  useMascotAnimation({ state, getLipSync, onPose });
+  useMascotAnimation({ state, emotion, gesture, getLipSync, onPose });
 
   const size = compact ? 120 : 220;
+  const caption =
+    EMOTION_LABELS[emotion] && state === "idle"
+      ? EMOTION_LABELS[emotion]
+      : STATE_LABELS[state];
 
   return (
     <div
       className={`relative flex flex-col items-center select-none ${className}`}
       data-mascot-state={state}
+      data-mascot-emotion={emotion}
+      data-mascot-gesture={gesture}
     >
-      {/* Stage — status rings + face */}
       <div
         className="relative flex items-center justify-center"
         style={{ width: size, height: size }}
@@ -109,10 +106,14 @@ export default function MascotAvatar({
                   ? "text-amber-600"
                   : state === "speaking"
                     ? "text-indigo-600"
-                    : "text-slate-500"
+                    : emotion === "happy" || emotion === "greeting"
+                      ? "text-emerald-600"
+                      : emotion === "sad"
+                        ? "text-sky-600"
+                        : "text-slate-500"
             }`}
           >
-            {STATE_LABELS[state]}
+            {caption}
           </p>
         </div>
       )}

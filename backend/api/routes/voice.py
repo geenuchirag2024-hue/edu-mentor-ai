@@ -36,6 +36,10 @@ async def synthesize(request: SynthesizeRequest):
 async def voice_query(
     audio: UploadFile = File(...),
     session_id: str | None = Form(default=None),
+    tutor_mode: str | None = Form(default="teacher"),
+    learner_id: str | None = Form(default=None),
+    use_notes: bool = Form(default=False),
+    hint_level: int = Form(default=0),
 ):
     audio_bytes = await audio.read()
     result = await asyncio.to_thread(
@@ -43,5 +47,9 @@ async def voice_query(
         audio_bytes,
         audio.filename or "audio.webm",
         session_id,
+        tutor_mode,
+        learner_id,
+        use_notes,
+        hint_level,
     )
     return VoiceQueryResponse(**result)

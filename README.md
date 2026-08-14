@@ -7,7 +7,13 @@ A web platform that teaches **Machine Learning** through an AI voice assistant m
 ## Features
 
 - Voice in / voice out ML tutoring (mic → STT → Qwen → TTS)
-- Chat UI with animated mascot (Mentor Mira)
+- Chat UI with animated mascot (Mentor Mira) — lip-sync, expressions, gestures
+- Tutor modes: Teacher, Doubt Solver, Quiz Master, Interviewer
+- AI quiz generator with hints, scoring, and adaptive difficulty
+- Personalized learning profile (weak/strong topics, XP, streaks, badges)
+- PDF/notes tutor (upload → retrieve → explain)
+- Interview practice with scored feedback
+- Progress dashboard
 - RAG over your ML curriculum (PDFs/text → Qdrant)
 - LoRA fine-tuning pipeline for custom tutor model
 - Multilingual UI (9 languages)
@@ -71,6 +77,14 @@ Open http://localhost:3000/chat
 | `/api/voice/synthesize` | POST | TTS only |
 | `/api/auth/register` | POST | User registration |
 | `/api/auth/login` | POST | User login |
+| `/api/tutor/quiz/generate` | POST | Generate an adaptive quiz |
+| `/api/tutor/quiz/grade` | POST | Score a quiz and update the learner profile |
+| `/api/tutor/quiz/hint` | POST | Hint for a quiz question (then solution) |
+| `/api/tutor/interview/start` | POST | Start a scored technical interview |
+| `/api/tutor/interview/answer` | POST | Evaluate an interview answer |
+| `/api/tutor/progress` | GET | Learning dashboard (XP, topics, streaks) |
+| `/api/tutor/notes/upload` | POST | Upload PDF/txt notes for RAG tutoring |
+| `/api/tutor/notes/ask` | POST | Ask a question grounded in uploaded notes |
 
 ## Project Structure
 

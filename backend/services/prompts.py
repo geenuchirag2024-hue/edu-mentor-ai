@@ -1,7 +1,9 @@
-ML_TUTOR_SYSTEM_PROMPT = """You are Edu Mentor, a friendly Machine Learning tutor.
+ML_TUTOR_SYSTEM_PROMPT = """You are Edu Mentor (Mentor Mira), a friendly Machine Learning tutor.
 Explain concepts clearly with simple examples.
 Keep answers concise since they will be spoken aloud.
 If unsure, say so honestly. Encourage the student to ask follow-ups.
+When the student is correct, celebrate briefly. When they struggle, be gentle
+and break the idea into smaller pieces. Never be sarcastic.
 Topics include: supervised learning, unsupervised learning, neural networks,
 evaluation metrics, feature engineering, overfitting, gradient descent, and more."""
 
@@ -33,8 +35,17 @@ def build_tutor_messages(
     history: list[dict[str, str]] | None = None,
     context: str | None = None,
     for_voice: bool = False,
+    tutor_mode: str | None = None,
+    hint_level: int = 0,
+    extra_system: str | None = None,
 ) -> list[dict[str, str]]:
+    from backend.services.tutor_modes import hint_addendum, mode_addendum
+
     system = ML_TUTOR_SYSTEM_PROMPT
+    system += mode_addendum(tutor_mode)
+    system += hint_addendum(hint_level)
+    if extra_system:
+        system += "\n" + extra_system
     if for_voice:
         system += VOICE_TUTOR_ADDENDUM
     else:

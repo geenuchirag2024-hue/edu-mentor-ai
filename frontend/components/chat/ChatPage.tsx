@@ -7,6 +7,7 @@ import ChatInput from "@/components/chat/ChatInput";
 import MascotAvatar from "@/components/mascot/MascotAvatar";
 import AudioPlayer from "@/components/voice/AudioPlayer";
 import type { AudioPlayerHandle } from "@/components/voice/AudioPlayer";
+import ModeSelector from "@/components/tutor/ModeSelector";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export default function ChatPage() {
@@ -14,10 +15,8 @@ export default function ChatPage() {
   const assistantRef = useRef<ReturnType<typeof useVoiceAssistant> | null>(null);
   const mascot = useMascotState();
 
-  // Shared amplitude bus for lip-sync (written at ~60 FPS, read by mascot rAF)
   const audioLevelRef = useRef(0);
 
-  // Compact mascot on small viewports (size only — component stays mounted)
   const [compact, setCompact] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -55,6 +54,7 @@ export default function ChatPage() {
         mascot.setIdle();
       }
     },
+    onCues: (emotion, gesture) => mascot.applyCues(emotion, gesture),
   });
   assistantRef.current = assistant;
 
@@ -67,12 +67,13 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full flex-col gap-3 md:flex-row md:gap-6">
-      {/* Chat column */}
       <div className="order-2 flex min-w-0 flex-1 flex-col md:order-1">
+        <ModeSelector value={assistant.tutorMode} onChange={assistant.setTutorMode} />
         <ChatWindow
           messages={assistant.messages}
           isProcessing={assistant.isProcessing}
           statusMessage={assistant.statusMessage}
+          tutorMode={assistant.tutorMode}
         />
         {assistant.error && (
           <p className="px-4 py-2 text-sm text-red-600">{assistant.error}</p>
@@ -95,15 +96,14 @@ export default function ChatPage() {
           onListeningStart={assistant.startListening}
           onListeningEnd={assistant.stopListening}
           onListeningCancel={assistant.cancelListening}
+          hintLevel={assistant.hintLevel}
+          onHintLevelChange={assistant.setHintLevel}
         />
       </div>
 
-      {/* Mascot — top on mobile, sidebar on desktop; single instance */}
       <aside
         className={`order-1 flex shrink-0 flex-col items-center justify-center md:order-2 ${
-          compact
-            ? "border-b border-slate-200 py-2"
-            : "w-72"
+          compact ? "border-b border-slate-200 py-2" : "w-72"
         }`}
       >
         <div
@@ -115,10 +115,17 @@ export default function ChatPage() {
         >
           <MascotAvatar
             state={mascot.state}
+            emotion={mascot.emotion}
+            gesture={mascot.gesture}
             audioLevelRef={audioLevelRef}
             compact={compact}
           />
         </div>
+        {!compact && (
+          <p className="mt-3 max-w-[16rem] text-center text-xs text-slate-500">
+            Mira listens, thinks, then speaks — with expressions that match the lesson.
+          </p>
+        )}
         {!compact && assistant.isSpeaking && (
           <button
             type="button"

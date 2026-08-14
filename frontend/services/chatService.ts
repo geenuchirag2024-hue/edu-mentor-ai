@@ -13,7 +13,13 @@ export async function sendChatMessage(
 
 export interface StreamChatCallbacks {
   onToken: (token: string) => void;
-  onComplete: (meta: { session_id: string; sources: string[] }) => void;
+  onComplete: (meta: {
+    session_id: string;
+    sources: string[];
+    emotion?: string;
+    gesture?: string;
+    response_type?: string;
+  }) => void;
 }
 
 export async function streamChatMessage(
@@ -54,12 +60,18 @@ export async function streamChatMessage(
         done?: boolean;
         session_id?: string;
         sources?: string[];
+        emotion?: string;
+        gesture?: string;
+        response_type?: string;
       };
       if (data.token) callbacks.onToken(data.token);
       if (data.done && data.session_id) {
         callbacks.onComplete({
           session_id: data.session_id,
           sources: data.sources ?? [],
+          emotion: data.emotion,
+          gesture: data.gesture,
+          response_type: data.response_type,
         });
       }
     }

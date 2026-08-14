@@ -19,12 +19,22 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     result = await asyncio.to_thread(
-        process_text_query, request.message, request.session_id
+        process_text_query,
+        request.message,
+        request.session_id,
+        False,
+        request.tutor_mode,
+        request.hint_level,
+        request.learner_id,
+        request.use_notes,
     )
     return ChatResponse(
         answer=result["answer"],
         session_id=result["session_id"],
         sources=result["sources"],
+        emotion=result.get("emotion", "confident"),
+        gesture=result.get("gesture", "point"),
+        response_type=result.get("response_type", "explanation"),
     )
 
 
@@ -35,15 +45,36 @@ async def chat_stream(request: ChatRequest):
 
         def produce() -> None:
             sid, token_iter, sources = stream_text_query(
-                request.message, request.session_id
+                request.message,
+                request.session_id,
+                False,
+                request.tutor_mode,
+                request.hint_level,
+                request.learner_id,
+                request.use_notes,
             )
             answer_parts: list[str] = []
             for token in token_iter:
                 answer_parts.append(token)
                 event_queue.put(("token", token))
             answer = "".join(answer_parts).strip()
-            finalize_text_query(sid, request.message, answer)
-            event_queue.put(("done", {"session_id": sid, "sources": sources}))
+            finalize_text_query(
+                sid, request.message, answer, learner_id=request.learner_id
+            )
+            from backend.services.mascot_cues import infer_mascot_cues
+
+            cues = infer_mascot_cues(
+                answer,
+                tutor_mode=request.tutor_mode,
+                user_message=request.message,
+                hint_level=request.hint_level,
+            )
+            event_queue.put(
+                (
+                    "done",
+                    {"session_id": sid, "sources": sources, **cues},
+                )
+            )
 
         threading.Thread(target=produce, daemon=True).start()
 

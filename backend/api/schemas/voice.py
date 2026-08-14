@@ -20,3 +20,6 @@ class VoiceQueryResponse(BaseModel):
     audio_base64: str
     session_id: str
     sources: list[str] = []
+    emotion: str = "confident"
+    gesture: str = "point"
+    response_type: str = "explanation"

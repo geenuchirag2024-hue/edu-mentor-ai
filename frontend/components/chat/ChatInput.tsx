@@ -10,6 +10,8 @@ interface ChatInputProps {
   onListeningStart?: () => void;
   onListeningEnd?: () => void;
   onListeningCancel?: () => void;
+  hintLevel?: number;
+  onHintLevelChange?: (level: number) => void;
 }
 
 export default function ChatInput({
@@ -19,6 +21,8 @@ export default function ChatInput({
   onListeningStart,
   onListeningEnd,
   onListeningCancel,
+  hintLevel = 0,
+  onHintLevelChange,
 }: ChatInputProps) {
   const [text, setText] = useState("");
 
@@ -41,6 +45,20 @@ export default function ChatInput({
         onListeningEnd={onListeningEnd}
         onListeningCancel={onListeningCancel}
       />
+      {onHintLevelChange && (
+        <button
+          type="button"
+          title="Hint instead of the full answer"
+          onClick={() => onHintLevelChange(hintLevel > 0 ? 0 : 1)}
+          className={`rounded-xl px-3 py-2.5 text-xs font-medium ${
+            hintLevel > 0
+              ? "bg-amber-100 text-amber-800"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          {hintLevel > 0 ? "Hint on" : "Hint"}
+        </button>
+      )}
       <input
         type="text"
         value={text}

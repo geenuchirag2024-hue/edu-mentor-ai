@@ -3,11 +3,15 @@ import type { VoiceQueryResponse } from "@/types/voice";
 
 export async function sendVoiceQuery(
   audioBlob: Blob,
-  sessionId?: string
+  sessionId?: string,
+  extra?: { tutor_mode?: string; learner_id?: string; use_notes?: boolean }
 ): Promise<VoiceQueryResponse> {
   const form = new FormData();
   form.append("audio", audioBlob, "recording.wav");
   if (sessionId) form.append("session_id", sessionId);
+  if (extra?.tutor_mode) form.append("tutor_mode", extra.tutor_mode);
+  if (extra?.learner_id) form.append("learner_id", extra.learner_id);
+  if (extra?.use_notes) form.append("use_notes", "true");
 
   const res = await fetch(`${API_URL}/api/assistant/voice-query`, {
     method: "POST",

@@ -33,6 +33,11 @@ const MentorFace = forwardRef<MentorFaceHandle, MentorFaceProps>(
     const mouthInnerRef = useRef<SVGEllipseElement>(null);
     const smilePathRef = useRef<SVGPathElement>(null);
     const teethRef = useRef<SVGRectElement>(null);
+    const leftArmRef = useRef<SVGGElement>(null);
+    const rightArmRef = useRef<SVGGElement>(null);
+    const leftCheekRef = useRef<SVGEllipseElement>(null);
+    const rightCheekRef = useRef<SVGEllipseElement>(null);
+    const sparkleRef = useRef<SVGGElement>(null);
 
     useImperativeHandle(ref, () => ({
       applyPose(pose: FacialPose) {
@@ -64,14 +69,31 @@ const MentorFace = forwardRef<MentorFaceHandle, MentorFaceProps>(
         rightPupilRef.current?.setAttribute("cx", String(128 + pose.gazeX));
         rightPupilRef.current?.setAttribute("cy", String(96 + pose.gazeY));
 
-        // Brows
+        // Brows — right brow can skew independently (confident / thinking)
         leftBrowRef.current?.setAttribute(
           "transform",
           `translate(0 ${pose.browRaise.toFixed(2)})`
         );
         rightBrowRef.current?.setAttribute(
           "transform",
-          `translate(0 ${pose.browRaise.toFixed(2)})`
+          `translate(0 ${(pose.browRaise + (pose.browSkew ?? 0)).toFixed(2)})`
+        );
+
+        leftArmRef.current?.setAttribute(
+          "transform",
+          `translate(58 196) rotate(${pose.armLeft.toFixed(1)}) translate(-58 -196)`
+        );
+        rightArmRef.current?.setAttribute(
+          "transform",
+          `translate(142 196) rotate(${pose.armRight.toFixed(1)}) translate(-142 -196)`
+        );
+
+        const blush = Math.min(1, Math.max(0, pose.blush));
+        leftCheekRef.current?.setAttribute("opacity", blush.toFixed(2));
+        rightCheekRef.current?.setAttribute("opacity", blush.toFixed(2));
+        sparkleRef.current?.setAttribute(
+          "opacity",
+          pose.armLeft < -90 && pose.armRight > 90 ? "1" : "0"
         );
 
         // Mouth: blend closed smile vs open speaking mouth
@@ -110,9 +132,9 @@ const MentorFace = forwardRef<MentorFaceHandle, MentorFaceProps>(
           teethRef.current.setAttribute("opacity", String(Math.min(0.95, open * 2.5)));
         }
 
-        // Closed / smiling lips path — fades as mouth opens
-        const smileDepth = 4 + smile * 8;
-        const smileHalf = 14 + smile * 4;
+        // Closed lips — positive smile curls down in SVG (U), negative is a frown
+        const smileDepth = 5 + smile * 10;
+        const smileHalf = 14 + Math.max(-0.2, smile) * 4;
         const y = 136;
         smilePathRef.current?.setAttribute(
           "d",
@@ -133,7 +155,7 @@ const MentorFace = forwardRef<MentorFaceHandle, MentorFaceProps>(
       <svg
         width={size}
         height={size}
-        viewBox="0 0 200 220"
+        viewBox="0 0 200 236"
         className={className}
         role="img"
         aria-label="Mentor Mira, your AI learning mentor"
@@ -164,10 +186,32 @@ const MentorFace = forwardRef<MentorFaceHandle, MentorFaceProps>(
         </defs>
 
         <g ref={rootRef}>
+          {/* Arms — pivoted from shoulders; sit behind the torso */}
+          <g ref={leftArmRef}>
+            <path
+              d="M 58 196 Q 38 214 32 232"
+              stroke="#4f6ef7"
+              strokeWidth="13"
+              fill="none"
+              strokeLinecap="round"
+            />
+            <circle cx="30" cy="234" r="7.5" fill="#f0c4a8" />
+          </g>
+          <g ref={rightArmRef}>
+            <path
+              d="M 142 196 Q 162 214 168 232"
+              stroke="#4f6ef7"
+              strokeWidth="13"
+              fill="none"
+              strokeLinecap="round"
+            />
+            <circle cx="170" cy="234" r="7.5" fill="#f0c4a8" />
+          </g>
+
           {/* Shoulders / torso — professional mentor look */}
-          <ellipse cx="100" cy="210" rx="62" ry="28" fill="url(#miraShirt)" filter="url(#miraSoftShadow)" />
+          <ellipse cx="100" cy="214" rx="62" ry="28" fill="url(#miraShirt)" filter="url(#miraSoftShadow)" />
           <path
-            d="M 55 198 Q 100 185 145 198 L 150 220 L 50 220 Z"
+            d="M 55 198 Q 100 185 145 198 L 150 236 L 50 236 Z"
             fill="url(#miraShirt)"
           />
           {/* Collar accent */}
@@ -197,9 +241,36 @@ const MentorFace = forwardRef<MentorFaceHandle, MentorFaceProps>(
               filter="url(#miraSoftShadow)"
             />
 
-            {/* Soft cheeks */}
-            <ellipse cx="68" cy="120" rx="10" ry="7" fill="url(#miraCheek)" />
-            <ellipse cx="132" cy="120" rx="10" ry="7" fill="url(#miraCheek)" />
+            {/* Soft cheeks — opacity driven by emotion */}
+            <ellipse
+              ref={leftCheekRef}
+              cx="68"
+              cy="120"
+              rx="10"
+              ry="7"
+              fill="url(#miraCheek)"
+            />
+            <ellipse
+              ref={rightCheekRef}
+              cx="132"
+              cy="120"
+              rx="10"
+              ry="7"
+              fill="url(#miraCheek)"
+            />
+
+            {/* Celebrate sparkles */}
+            <g ref={sparkleRef} opacity="0">
+              <text x="28" y="58" fontSize="16">
+                ✦
+              </text>
+              <text x="158" y="52" fontSize="14">
+                ✦
+              </text>
+              <text x="42" y="42" fontSize="11">
+                ✧
+              </text>
+            </g>
 
             {/* Nose (subtle) */}
             <path

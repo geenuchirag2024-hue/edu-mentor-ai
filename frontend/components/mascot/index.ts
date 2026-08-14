@@ -8,5 +8,5 @@ export { default as MascotStatusRing } from "./MascotStatusRing";
 export { useMascotState } from "./useMascotState";
 export { useLipSync } from "./useLipSync";
 export { useMascotAnimation } from "./useMascotAnimation";
-export { STATE_LABELS, STATE_POSES } from "./mascotExpressions";
+export { STATE_LABELS, STATE_POSES, EMOTION_POSES } from "./mascotExpressions";
 export type { FacialPose } from "./mascotExpressions";

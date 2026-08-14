@@ -34,6 +34,7 @@ data/models/piper/**/*.onnx
 data/models/piper/**/*.onnx.json
 data/embeddings/*
 !data/embeddings/.gitkeep
+data/learner_profiles.json
 data/ml-content/processed/*
 !data/ml-content/processed/.gitkeep
 
