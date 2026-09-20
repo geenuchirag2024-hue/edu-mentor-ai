@@ -1,35 +1,47 @@
 "use client";
 
+import { useEffect, useRef, type MutableRefObject } from "react";
 import type { MascotState } from "@/types/voice";
 
 interface MascotStatusRingProps {
   state: MascotState;
+  audioLevelRef?: MutableRefObject<number>;
 }
 
-/**
- * Decorative status aura around the mentor:
- * - listening: expanding mic rings
- * - thinking: orbiting dots
- * - speaking: soft voice glow
- */
-export default function MascotStatusRing({ state }: MascotStatusRingProps) {
+export default function MascotStatusRing({
+  state,
+  audioLevelRef,
+}: MascotStatusRingProps) {
+  const barsRef = useRef<(HTMLSpanElement | null)[]>([]);
+
+  useEffect(() => {
+    if (state !== "speaking") return;
+    let raf = 0;
+    const tick = () => {
+      const level = audioLevelRef?.current ?? 0;
+      barsRef.current.forEach((el, i) => {
+        if (!el) return;
+        const spread = 0.22 + ((i * 17) % 10) / 40;
+        const scale = 0.22 + level * (0.55 + spread);
+        el.style.transform = `scaleY(${scale.toFixed(3)})`;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [state, audioLevelRef]);
+
   if (state === "idle") return null;
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 flex items-center justify-center"
+      className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
       aria-hidden
     >
       {state === "listening" && (
         <>
           <span className="mascot-ring mascot-ring-listen" />
           <span className="mascot-ring mascot-ring-listen mascot-ring-delay" />
-          {/* Mic indicator */}
-          <span className="absolute bottom-[12%] flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z" />
-            </svg>
-          </span>
         </>
       )}
 
@@ -42,16 +54,50 @@ export default function MascotStatusRing({ state }: MascotStatusRingProps) {
       )}
 
       {state === "speaking" && (
-        <>
-          <span className="mascot-ring mascot-ring-speak" />
-          <span className="absolute bottom-[10%] flex gap-1">
-            <span className="mascot-voice-bar" />
-            <span className="mascot-voice-bar mascot-voice-bar-2" />
-            <span className="mascot-voice-bar mascot-voice-bar-3" />
-            <span className="mascot-voice-bar mascot-voice-bar-4" />
-          </span>
-        </>
+        <span className="mascot-ring mascot-ring-speak" />
       )}
     </div>
+  );
+}
+
+export function SpeakingWaveform({
+  audioLevelRef,
+  active,
+}: {
+  audioLevelRef?: MutableRefObject<number>;
+  active: boolean;
+}) {
+  const barsRef = useRef<(HTMLSpanElement | null)[]>([]);
+
+  useEffect(() => {
+    if (!active) return;
+    let raf = 0;
+    const tick = () => {
+      const level = audioLevelRef?.current ?? 0;
+      barsRef.current.forEach((el, i) => {
+        if (!el) return;
+        const spread = 0.18 + ((i * 13) % 11) / 36;
+        el.style.transform = `scaleY(${(0.2 + level * (0.8 + spread)).toFixed(3)})`;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [active, audioLevelRef]);
+
+  if (!active) return null;
+
+  return (
+    <span className="mira-eq" aria-hidden>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <span
+          key={i}
+          ref={(el) => {
+            barsRef.current[i] = el;
+          }}
+          className="mira-eq-bar"
+        />
+      ))}
+    </span>
   );
 }

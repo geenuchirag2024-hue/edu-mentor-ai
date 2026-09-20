@@ -1,4 +1,4 @@
-import { API_URL, apiFetch } from "./api";
+import { apiFetch, apiRequest, friendlyApiError } from "./api";
 import type { ChatRequest, ChatResponse } from "@/types/chat";
 
 export async function sendChatMessage(
@@ -22,19 +22,31 @@ export interface StreamChatCallbacks {
   }) => void;
 }
 
+function chatStreamUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (explicit) return `${explicit}/api/chat/stream`;
+  // Hit FastAPI directly so Next.js rewrites cannot buffer SSE (which hid Mira's reply).
+  if (typeof window !== "undefined") {
+    return "http://127.0.0.1:8000/api/chat/stream";
+  }
+  return "/api/chat/stream";
+}
+
 export async function streamChatMessage(
   request: ChatRequest,
-  callbacks: StreamChatCallbacks
+  callbacks: StreamChatCallbacks,
+  signal?: AbortSignal
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/api/chat/stream`, {
+  const res = await apiRequest(chatStreamUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
+    signal,
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || `API error ${res.status}`);
+    throw new Error(friendlyApiError(res.status, text));
   }
 
   const reader = res.body?.getReader();
@@ -74,6 +86,32 @@ export async function streamChatMessage(
           response_type: data.response_type,
         });
       }
+    }
+  }
+
+  if (buffer.startsWith("data: ")) {
+    try {
+      const data = JSON.parse(buffer.slice(6)) as {
+        token?: string;
+        done?: boolean;
+        session_id?: string;
+        sources?: string[];
+        emotion?: string;
+        gesture?: string;
+        response_type?: string;
+      };
+      if (data.token) callbacks.onToken(data.token);
+      if (data.done && data.session_id) {
+        callbacks.onComplete({
+          session_id: data.session_id,
+          sources: data.sources ?? [],
+          emotion: data.emotion,
+          gesture: data.gesture,
+          response_type: data.response_type,
+        });
+      }
+    } catch {
+      /* trailing partial line */
     }
   }
 }

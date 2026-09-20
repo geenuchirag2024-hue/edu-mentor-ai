@@ -16,7 +16,10 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = (
+        "http://localhost:3000,http://localhost:3001,"
+        "http://127.0.0.1:3000,http://127.0.0.1:3001"
+    )
 
     llm_model_path: str = str(PROJECT_ROOT / "data/models/qwen3.gguf")
     llm_context_length: int = 1536

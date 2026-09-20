@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
@@ -17,6 +18,7 @@ class LLMService:
         self.settings = get_settings()
         self._model = None
         self._mock_mode = False
+        self._gen_lock = threading.Lock()
 
     def _load(self) -> None:
         if self._model is not None or self._mock_mode:
@@ -70,17 +72,22 @@ class LLMService:
             return
 
         assert self._model is not None
-        stream = self._model.create_chat_completion(
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=0.6,
-            stream=True,
-        )
-        for chunk in stream:
-            delta = chunk["choices"][0].get("delta", {})
-            content = delta.get("content")
-            if content:
-                yield content
+        with self._gen_lock:
+            stream = self._model.create_chat_completion(
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=0.6,
+                stream=True,
+            )
+
+            def _tokens() -> Iterator[str]:
+                for chunk in stream:
+                    delta = chunk["choices"][0].get("delta", {})
+                    content = delta.get("content")
+                    if content:
+                        yield content
+
+            yield from _strip_think_stream(_tokens())
 
     @staticmethod
     def _mock_response(question: str) -> str:
@@ -109,6 +116,40 @@ class LLMService:
             "In general, ML models learn patterns from data to make predictions or decisions. "
             "Download the Qwen model via scripts/download_models.py for richer answers."
         )
+
+
+def _strip_think_stream(tokens: Iterator[str]) -> Iterator[str]:
+    """Drop Qwen <think>...</think> blocks so they are not shown or spoken."""
+    buf = ""
+    hiding = False
+    open_tag, close_tag = "<think>", "</think>"
+    for token in tokens:
+        buf += token
+        while buf:
+            lower = buf.lower()
+            if hiding:
+                idx = lower.find(close_tag)
+                if idx == -1:
+                    buf = buf[-(len(close_tag) - 1) :]
+                    break
+                buf = buf[idx + len(close_tag) :]
+                hiding = False
+                continue
+            idx = lower.find(open_tag)
+            if idx == -1:
+                hold = len(open_tag) - 1
+                emit, buf = buf[:-hold], buf[-hold:]
+                if emit:
+                    yield emit
+                break
+            if idx:
+                yield buf[:idx]
+            buf = buf[idx + len(open_tag) :]
+            hiding = True
+    if hiding:
+        return
+    if buf:
+        yield buf
 
 
 @lru_cache

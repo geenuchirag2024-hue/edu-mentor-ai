@@ -14,11 +14,15 @@ IMPORTANT — this answer will be read aloud:
 - Do NOT use emojis, markdown, or bullet lists — plain spoken sentences only.
 - Write "square feet" not "sqft", "machine learning" not "ML" unless you spell it out.
 - Do NOT give a lecture summary unless the student explicitly asks for one.
-- Do NOT list every ML topic unless asked."""
+- Do NOT list every ML topic unless asked.
+- Never write <think> tags — answer directly in spoken sentences."""
 
 TEXT_TUTOR_ADDENDUM = """
 Keep answers concise: 2-5 sentences for simple questions, one short paragraph for complex topics.
-Skip long introductions and avoid repeating the question."""
+Skip long introductions and avoid repeating the question.
+Never write <think> tags or hidden chain-of-thought — answer directly."""
+
+NO_THINK_SUFFIX = "\n/no_think"
 
 GREETING_WORDS = {"hi", "hello", "hey", "hiya", "good morning", "good afternoon", "good evening"}
 
@@ -61,5 +65,6 @@ def build_tutor_messages(
     messages: list[dict[str, str]] = [{"role": "system", "content": system}]
     if history:
         messages.extend(history[-4:])
-    messages.append({"role": "user", "content": user_message})
+    # Qwen3 otherwise spends the whole token budget inside <think> on CPU.
+    messages.append({"role": "user", "content": f"{user_message}{NO_THINK_SUFFIX}"})
     return messages

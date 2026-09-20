@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import MascotAvatar from "@/components/mascot/MascotAvatar";
+import MiraStage from "@/components/mascot/MiraStage";
 import { getLearnerId } from "@/services/learner";
 import { generateQuiz, gradeQuiz, requestHint } from "@/services/tutorService";
 import type { QuizGradeResult, QuizPayload } from "@/types/tutor";
@@ -118,10 +118,10 @@ export default function QuizPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto py-4 md:flex-row">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto md:flex-row">
       <div className="min-w-0 flex-1 space-y-4">
         {!quiz && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="glass-panel p-5">
             <h2 className="text-lg font-semibold text-slate-800">Generate Quiz</h2>
             <p className="mt-1 text-sm text-slate-500">
               Mira builds MCQs, true/false, and short answers, then adapts difficulty from your history.
@@ -186,7 +186,7 @@ export default function QuizPage() {
         )}
 
         {quiz && question && !result && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="glass-panel p-5">
             <div className="mb-3 flex items-center justify-between text-xs text-slate-500">
               <span>
                 {quiz.topic} · {quiz.difficulty}
@@ -265,7 +265,7 @@ export default function QuizPage() {
         )}
 
         {result && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="glass-panel p-5">
             <h2 className="text-lg font-semibold">
               Score: {result.score}/{result.total} · {result.accuracy}%
             </h2>
@@ -313,10 +313,13 @@ export default function QuizPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
 
-      <aside className="flex w-full shrink-0 flex-col items-center md:w-64">
-        <div className="rounded-3xl bg-gradient-to-b from-slate-50 to-indigo-50/60 px-4 py-6 shadow-sm ring-1 ring-slate-200/80">
-          <MascotAvatar state={mascotState} emotion={emotion} gesture={gesture} />
-        </div>
+      <aside className="w-full shrink-0 md:w-80">
+        <MiraStage
+          state={mascotState}
+          emotion={emotion}
+          gesture={gesture}
+          size={220}
+        />
       </aside>
     </div>
   );

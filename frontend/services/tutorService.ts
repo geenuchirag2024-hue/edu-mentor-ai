@@ -1,4 +1,4 @@
-import { API_URL, apiFetch } from "./api";
+import { apiFetch, apiRequest } from "./api";
 import type {
   InterviewStart,
   InterviewTurnResult,
@@ -85,7 +85,7 @@ export async function uploadNotes(
   form.append("file", file);
   form.append("session_id", sessionId);
   form.append("learner_id", learnerId);
-  const res = await fetch(`${API_URL}/api/tutor/notes/upload`, {
+  const res = await apiRequest("/api/tutor/notes/upload", {
     method: "POST",
     body: form,
   });

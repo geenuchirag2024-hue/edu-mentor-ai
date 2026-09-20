@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
 from functools import lru_cache
 from pathlib import Path
 
 from backend.config import get_settings
+from backend.utils.audio_preprocess import looks_like_hallucination, preprocess_wav
 
 logger = logging.getLogger(__name__)
 
@@ -34,28 +36,39 @@ class STTService:
             return ""
 
         self._load()
+        audio_bytes = preprocess_wav(audio_bytes)
         suffix = Path(filename).suffix or ".wav"
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(audio_bytes)
-            tmp_path = tmp.name
+        fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+        Path(tmp_path).write_bytes(audio_bytes)
 
         logger.info("STT input: %d bytes, model=%s", len(audio_bytes), self.settings.whisper_model)
 
         try:
-            segments, info = self._model.transcribe(
-                tmp_path,
-                beam_size=1,
-                language="en",
-                vad_filter=True,
-            )
-            text = " ".join(segment.text.strip() for segment in segments).strip()
-            logger.info("STT result: '%s' (lang=%s)", text, getattr(info, "language", "?"))
+            text = self._transcribe_file(tmp_path, vad_filter=False)
+            if looks_like_hallucination(text):
+                logger.info("STT hallucination filtered: '%s'", text)
+                return ""
+            logger.info("STT result: '%s'", text)
             return text
         except Exception as exc:
             logger.error("STT failed: %s", exc)
             return ""
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+
+    def _transcribe_file(self, path: str, vad_filter: bool) -> str:
+        segments, info = self._model.transcribe(
+            path,
+            beam_size=1,
+            language="en",
+            vad_filter=vad_filter,
+            condition_on_previous_text=False,
+            without_timestamps=True,
+        )
+        text = " ".join(segment.text.strip() for segment in segments).strip()
+        logger.info("STT lang=%s vad=%s", getattr(info, "language", "?"), vad_filter)
+        return text
 
 
 @lru_cache

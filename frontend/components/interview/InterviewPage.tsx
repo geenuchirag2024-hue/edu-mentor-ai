@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import MascotAvatar from "@/components/mascot/MascotAvatar";
+import MiraStage from "@/components/mascot/MiraStage";
 import MicButton from "@/components/voice/MicButton";
 import { getLearnerId } from "@/services/learner";
 import { answerInterview, startInterview } from "@/services/tutorService";
-import { API_URL } from "@/services/api";
+import { apiRequest } from "@/services/api";
 import type { InterviewTurnResult } from "@/types/tutor";
 import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
 
@@ -87,7 +87,7 @@ export default function InterviewPage() {
     const form = new FormData();
     form.append("audio", blob, "recording.wav");
     try {
-      const res = await fetch(`${API_URL}/api/voice/transcribe`, {
+      const res = await apiRequest("/api/voice/transcribe", {
         method: "POST",
         body: form,
       });
@@ -106,10 +106,10 @@ export default function InterviewPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto py-4 md:flex-row">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto md:flex-row">
       <div className="min-w-0 flex-1 space-y-4">
         {!interviewId && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="glass-panel p-5">
             <h2 className="text-lg font-semibold">Interview Mode</h2>
             <p className="mt-1 text-sm text-slate-500">
               Mira asks technical questions, scores your answers, and gives feedback.
@@ -134,7 +134,7 @@ export default function InterviewPage() {
         )}
 
         {prompt && !finished && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="glass-panel p-5">
             <p className="text-xs text-slate-500">
               Question {number} / {total}
             </p>
@@ -170,7 +170,7 @@ export default function InterviewPage() {
         {history.map((turn, i) => (
           <article
             key={`${turn.interview_id}-${i}`}
-            className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm"
+            className="glass-panel p-4 text-sm"
           >
             <p className="font-medium text-indigo-700">Score: {turn.score}/10</p>
             <p className="mt-1 text-slate-700">{turn.feedback}</p>
@@ -211,10 +211,13 @@ export default function InterviewPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
 
-      <aside className="flex w-full shrink-0 flex-col items-center md:w-64">
-        <div className="rounded-3xl bg-gradient-to-b from-slate-50 to-indigo-50/60 px-4 py-6 shadow-sm ring-1 ring-slate-200/80">
-          <MascotAvatar state={mascotState} emotion={emotion} gesture={gesture} />
-        </div>
+      <aside className="w-full shrink-0 md:w-80">
+        <MiraStage
+          state={mascotState}
+          emotion={emotion}
+          gesture={gesture}
+          size={220}
+        />
       </aside>
     </div>
   );

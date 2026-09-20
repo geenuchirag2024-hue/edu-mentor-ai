@@ -12,6 +12,9 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+const TEXT_TIMEOUT_MS = 180_000;
+const VOICE_TIMEOUT_MS = 180_000;
+
 interface UseVoiceAssistantOptions {
   onStateChange?: (state: MascotState) => void;
   onAudioReady?: (base64: string) => void;
@@ -35,6 +38,8 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   tutorModeRef.current = tutorMode;
   const hintLevelRef = useRef(hintLevel);
   hintLevelRef.current = hintLevel;
+  const abortRef = useRef<AbortController | null>(null);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
   const setMascot = useCallback((state: MascotState) => {
     optionsRef.current.onStateChange?.(state);
@@ -73,26 +78,58 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
 
   const stopSpeaking = useCallback(() => {
     setIsSpeaking(false);
+    setSpeakingMessageId(null);
     optionsRef.current.onSpeakingChange?.(false);
     setMascot("idle");
   }, [setMascot]);
 
+  const cancelTurn = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsProcessing(false);
+    setIsSpeaking(false);
+    setSpeakingMessageId(null);
+    setStatusMessage(null);
+    setMascot("idle");
+    optionsRef.current.onSpeakingChange?.(false);
+  }, [setMascot]);
+
   const playAnswerAudio = useCallback(
-    async (answer: string) => {
+    async (
+      answer: string,
+      signal?: AbortSignal,
+      messageId?: string,
+      onReadyToSpeak?: () => void
+    ) => {
+      if (!answer.trim()) {
+        setMascot("idle");
+        return false;
+      }
       try {
-        setStatusMessage("Speaking...");
-        const audioBase64 = await synthesizeSpeech(answer);
+        setStatusMessage("Preparing voice...");
+        const audioBase64 = await synthesizeSpeech(answer, signal);
+        if (signal?.aborted) {
+          setMascot("idle");
+          onReadyToSpeak?.();
+          return false;
+        }
         if (!audioBase64) {
           setMascot("idle");
-          return;
+          onReadyToSpeak?.();
+          return false;
         }
+        onReadyToSpeak?.();
+        if (messageId) setSpeakingMessageId(messageId);
         setIsSpeaking(true);
         optionsRef.current.onSpeakingChange?.(true);
         setMascot("speaking");
         optionsRef.current.onAudioReady?.(audioBase64);
+        return true;
       } catch {
-        // Keep the text reply even if TTS fails
+        setSpeakingMessageId(null);
         setMascot("idle");
+        onReadyToSpeak?.();
+        return false;
       }
     },
     [setMascot]
@@ -101,6 +138,11 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   const sendText = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const timer = window.setTimeout(() => controller.abort(), TEXT_TIMEOUT_MS);
+
       setError(null);
       setIsProcessing(true);
       setStatusMessage("Generating answer...");
@@ -108,12 +150,8 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
       addMessage("user", text, undefined, false);
 
       const assistantId = makeId();
-      setMessages((prev) => [
-        ...prev,
-        { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
-      ]);
-
       let fullAnswer = "";
+      let sources: string[] | undefined;
 
       try {
         await streamChatMessage(
@@ -127,33 +165,81 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
           {
             onToken: (token) => {
               fullAnswer += token;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId ? { ...m, content: m.content + token } : m
-                )
-              );
             },
             onComplete: (meta) => {
               setSessionId(meta.session_id);
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId ? { ...m, sources: meta.sources } : m
-                )
-              );
+              sources = meta.sources;
               optionsRef.current.onCues?.(
                 meta.emotion as MascotEmotion | undefined,
                 meta.gesture as MascotGesture | undefined
               );
             },
-          }
+          },
+          controller.signal
         );
-        setIsProcessing(false);
-        await playAnswerAudio(fullAnswer);
+        if (!fullAnswer.trim()) {
+          const fallback = "I couldn't generate an answer in time. Try a shorter question.";
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: assistantId,
+              role: "assistant",
+              content: fallback,
+              timestamp: new Date(),
+            },
+          ]);
+          setMascot("idle");
+          return;
+        }
+        window.clearTimeout(timer);
+        await playAnswerAudio(fullAnswer, controller.signal, assistantId, () => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: assistantId,
+              role: "assistant",
+              content: fullAnswer,
+              timestamp: new Date(),
+              sources,
+            },
+          ]);
+        });
       } catch (e) {
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-        setError(e instanceof Error ? e.message : "Failed to send message");
+        const aborted = controller.signal.aborted;
+        const message =
+          aborted
+            ? "That took too long on this machine. Try a shorter question."
+            : e instanceof Error
+              ? e.message
+              : "Failed to send message";
+        setMessages((prev) => {
+          if (fullAnswer.trim()) {
+            return [
+              ...prev,
+              {
+                id: assistantId,
+                role: "assistant",
+                content: fullAnswer,
+                timestamp: new Date(),
+                sources,
+              },
+            ];
+          }
+          return [
+            ...prev,
+            {
+              id: assistantId,
+              role: "assistant",
+              content: message,
+              timestamp: new Date(),
+            },
+          ];
+        });
+        if (!aborted) setError(message);
         setMascot("idle");
       } finally {
+        window.clearTimeout(timer);
+        if (abortRef.current === controller) abortRef.current = null;
         setIsProcessing(false);
         setStatusMessage(null);
       }
@@ -169,6 +255,11 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
         setMascot("idle");
         return;
       }
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const timer = window.setTimeout(() => controller.abort(), VOICE_TIMEOUT_MS);
 
       setError(null);
       setIsProcessing(true);
@@ -189,12 +280,18 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
 
       try {
         setStatusMessage("Generating answer...");
-        const res = await sendVoiceQuery(audioBlob, sessionId, {
-          tutor_mode: tutorModeRef.current,
-          learner_id: getLearnerId(),
-        });
+        const res = await sendVoiceQuery(
+          audioBlob,
+          sessionId,
+          {
+            tutor_mode: tutorModeRef.current,
+            learner_id: getLearnerId(),
+          },
+          controller.signal
+        );
         setSessionId(res.session_id);
 
+        const assistantId = makeId();
         setMessages((prev) => {
           const rest = prev.filter((m) => m.id !== placeholderId);
           return [
@@ -207,7 +304,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
               isVoice: true,
             },
             {
-              id: makeId(),
+              id: assistantId,
               role: "assistant" as const,
               content: res.answer,
               timestamp: new Date(),
@@ -217,6 +314,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
         });
 
         if (res.audio_base64) {
+          setSpeakingMessageId(assistantId);
           setIsSpeaking(true);
           optionsRef.current.onSpeakingChange?.(true);
           setMascot("speaking");
@@ -227,9 +325,13 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
         }
       } catch (e) {
         setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
-        setError(e instanceof Error ? e.message : "Voice query failed");
+        if (!controller.signal.aborted) {
+          setError(e instanceof Error ? e.message : "Voice query failed");
+        }
         setMascot("idle");
       } finally {
+        window.clearTimeout(timer);
+        if (abortRef.current === controller) abortRef.current = null;
         setIsProcessing(false);
         setStatusMessage(null);
       }
@@ -242,6 +344,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     sessionId,
     isProcessing,
     isSpeaking,
+    speakingMessageId,
     statusMessage,
     error,
     tutorMode,
@@ -254,5 +357,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     stopListening,
     cancelListening,
     stopSpeaking,
+    cancelTurn,
+    playAnswerAudio,
   };
 }

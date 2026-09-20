@@ -3,36 +3,275 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
+  --background: #eef3fb;
   --foreground: #0f172a;
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
-  --user-bubble: #4f46e5;
+  --primary: #6d28d9;
+  --primary-hover: #5b21b6;
+  --user-bubble: #6d28d9;
   --assistant-bubble: #ffffff;
   --border: #e2e8f0;
+  --panel: rgba(255, 255, 255, 0.72);
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(920px 480px at 8% -8%, rgb(196 181 253 / 0.42), transparent 58%),
+    radial-gradient(780px 420px at 100% 0%, rgb(165 180 252 / 0.38), transparent 54%),
+    radial-gradient(640px 360px at 70% 110%, rgb(191 219 254 / 0.45), transparent 55%),
+    linear-gradient(180deg, #f5f8ff 0%, #eef3fb 100%);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.glass-bar,
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 18px 40px -28px rgb(15 23 42 / 0.35),
+    0 1px 0 rgb(255 255 255 / 0.8) inset;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: 24px;
+}
+
+.glass-panel {
+  border-radius: 28px;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Mentor Mira mascot — status overlays (CSS only; face motion is JS / rAF)  */
+/* Mentor Mira — original portraits (no chroma-key / canvas cutout)           */
 /* -------------------------------------------------------------------------- */
+
+.mira-stage {
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+  isolation: isolate;
+  contain: layout style;
+  opacity: 0;
+  border-radius: 1.35rem;
+}
+
+.mira-caret {
+  display: inline-block;
+  margin-left: 1px;
+  font-weight: 400;
+  color: #7c3aed;
+  animation: mira-caret 0.9s step-end infinite;
+}
+
+@keyframes mira-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.mira-stage-ready {
+  opacity: 1;
+  transition: opacity 0.45s ease;
+}
+
+.mira-head {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform-origin: 50% 62%;
+  will-change: transform;
+}
+
+.mira-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  pointer-events: none;
+  user-select: none;
+}
+
+.mira-expr {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.mira-speak {
+  opacity: 0;
+  /* Composite only the mouth so the face doesn't ghost during speech. */
+  -webkit-mask-image: radial-gradient(
+    ellipse 34% 20% at 50% 48%,
+    #000 0%,
+    #000 42%,
+    rgb(0 0 0 / 0.55) 62%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    ellipse 34% 20% at 50% 48%,
+    #000 0%,
+    #000 42%,
+    rgb(0 0 0 / 0.55) 62%,
+    transparent 78%
+  );
+}
+
+.mira-blink-mask {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 34%,
+    rgb(0 0 0 / 0.8) 42%,
+    transparent 52%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 34%,
+    rgb(0 0 0 / 0.8) 42%,
+    transparent 52%
+  );
+}
+
+.mira-presence {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  filter: drop-shadow(0 20px 32px rgb(15 23 42 / 0.2));
+}
+
+.mira-presence-fill {
+  width: 100%;
+  height: 100%;
+}
+
+.mira-presence-fill .mira-stage {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: 2 / 3;
+}
+
+.mira-presence-panel {
+  background: transparent;
+}
+
+.mira-presence-speak::after,
+.mira-presence-listen::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  width: 42%;
+  height: 10%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(12px);
+}
+
+.mira-presence-speak::after {
+  background: rgb(99 102 241 / 0.28);
+}
+
+.mira-presence-listen::after {
+  background: rgb(16 185 129 / 0.22);
+}
+
+.mira-think-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mira-think-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.mira-think-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #7c3aed;
+  animation: mira-think-bounce 1.1s ease-in-out infinite;
+}
+
+.mira-think-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.mira-think-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes mira-think-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.mira-status-pulse {
+  animation: mira-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes mira-dot {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.mira-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.mira-eq-bar {
+  width: 2.5px;
+  height: 14px;
+  border-radius: 1px;
+  background: currentColor;
+  transform-origin: bottom;
+  transform: scaleY(0.25);
+}
 
 .mascot-ring {
   position: absolute;
-  border-radius: 9999px;
-  border: 2px solid transparent;
-  width: 88%;
-  height: 88%;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  width: 78%;
+  height: 58%;
+  top: 18%;
 }
 
 .mascot-ring-listen {
-  border-color: rgb(16 185 129 / 0.45);
-  animation: mascot-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  border-color: rgb(16 185 129 / 0.35);
+  animation: mascot-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 .mascot-ring-delay {
@@ -40,51 +279,23 @@ body {
 }
 
 .mascot-ring-speak {
-  border-color: rgb(79 70 229 / 0.35);
-  box-shadow: 0 0 24px rgb(99 102 241 / 0.25);
-  animation: mascot-glow 1.4s ease-in-out infinite;
-}
-
-@keyframes mascot-ping {
-  0% {
-    transform: scale(0.92);
-    opacity: 0.85;
-  }
-  70% {
-    transform: scale(1.12);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1.12);
-    opacity: 0;
-  }
-}
-
-@keyframes mascot-glow {
-  0%,
-  100% {
-    transform: scale(0.96);
-    opacity: 0.55;
-  }
-  50% {
-    transform: scale(1.04);
-    opacity: 1;
-  }
+  border-color: rgb(139 92 246 / 0.18);
+  box-shadow: 0 0 28px rgb(139 92 246 / 0.16);
 }
 
 .mascot-think-orbit {
   position: absolute;
-  top: 6%;
-  right: 10%;
+  top: 8%;
+  right: 14%;
   display: flex;
   gap: 5px;
   align-items: flex-end;
-  height: 18px;
+  height: 16px;
 }
 
 .mascot-think-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 9999px;
   background: #f59e0b;
   animation: mascot-bounce 1.1s ease-in-out infinite;
@@ -97,7 +308,21 @@ body {
 
 .mascot-think-dot:nth-child(3) {
   animation-delay: 0.3s;
-  background: #f59e0b;
+}
+
+@keyframes mascot-ping {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.12);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.12);
+    opacity: 0;
+  }
 }
 
 @keyframes mascot-bounce {
@@ -108,42 +333,31 @@ body {
     opacity: 0.45;
   }
   40% {
-    transform: translateY(-7px);
+    transform: translateY(-6px);
     opacity: 1;
   }
 }
 
-.mascot-voice-bar {
-  width: 3px;
-  height: 10px;
-  border-radius: 2px;
-  background: #6366f1;
-  animation: mascot-voice 0.7s ease-in-out infinite;
+html.mira-paused .mascot-ring-listen,
+html.mira-paused .mascot-think-dot,
+html.mira-paused .mira-status-pulse,
+html.mira-paused .mira-think-dots span {
+  animation-play-state: paused;
 }
 
-.mascot-voice-bar-2 {
-  animation-delay: 0.1s;
-  height: 14px;
-}
-
-.mascot-voice-bar-3 {
-  animation-delay: 0.2s;
-  height: 8px;
-}
-
-.mascot-voice-bar-4 {
-  animation-delay: 0.3s;
-  height: 12px;
-}
-
-@keyframes mascot-voice {
-  0%,
-  100% {
-    transform: scaleY(0.45);
-    opacity: 0.55;
+@media (prefers-reduced-motion: reduce) {
+  .mira-expr {
+    transition: none;
   }
-  50% {
-    transform: scaleY(1);
-    opacity: 1;
+
+  .mira-head {
+    will-change: auto;
+  }
+
+  .mascot-ring-listen,
+  .mascot-think-dot,
+  .mira-status-pulse,
+  .mira-think-dots span {
+    animation: none;
   }
 }

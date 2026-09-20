@@ -15,17 +15,20 @@ export default function NavBar() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap gap-1" aria-label="Main">
+    <nav
+      className="flex flex-1 flex-wrap justify-center gap-0.5 rounded-full bg-slate-100/80 p-1"
+      aria-label="Main"
+    >
       {LINKS.map((link) => {
         const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
           <Link
             key={link.href}
             href={link.href}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
               active
-                ? "bg-indigo-600 text-white"
-                : "text-slate-600 hover:bg-slate-100"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-800"
             }`}
           >
             {link.label}

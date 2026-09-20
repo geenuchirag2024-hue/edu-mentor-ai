@@ -44,42 +44,62 @@ async def chat_stream(request: ChatRequest):
         event_queue: queue.Queue[tuple[str, object]] = queue.Queue()
 
         def produce() -> None:
-            sid, token_iter, sources = stream_text_query(
-                request.message,
-                request.session_id,
-                False,
-                request.tutor_mode,
-                request.hint_level,
-                request.learner_id,
-                request.use_notes,
-            )
-            answer_parts: list[str] = []
-            for token in token_iter:
-                answer_parts.append(token)
-                event_queue.put(("token", token))
-            answer = "".join(answer_parts).strip()
-            finalize_text_query(
-                sid, request.message, answer, learner_id=request.learner_id
-            )
-            from backend.services.mascot_cues import infer_mascot_cues
-
-            cues = infer_mascot_cues(
-                answer,
-                tutor_mode=request.tutor_mode,
-                user_message=request.message,
-                hint_level=request.hint_level,
-            )
-            event_queue.put(
-                (
-                    "done",
-                    {"session_id": sid, "sources": sources, **cues},
+            try:
+                sid, token_iter, sources = stream_text_query(
+                    request.message,
+                    request.session_id,
+                    False,
+                    request.tutor_mode,
+                    request.hint_level,
+                    request.learner_id,
+                    request.use_notes,
                 )
-            )
+                event_queue.put(("meta", {"session_id": sid, "sources": sources}))
+                answer_parts: list[str] = []
+                for token in token_iter:
+                    answer_parts.append(token)
+                    event_queue.put(("token", token))
+                answer = "".join(answer_parts).strip()
+                finalize_text_query(
+                    sid, request.message, answer, learner_id=request.learner_id
+                )
+                from backend.services.mascot_cues import infer_mascot_cues
+
+                cues = infer_mascot_cues(
+                    answer,
+                    tutor_mode=request.tutor_mode,
+                    user_message=request.message,
+                    hint_level=request.hint_level,
+                )
+                event_queue.put(
+                    (
+                        "done",
+                        {"session_id": sid, "sources": sources, **cues},
+                    )
+                )
+            except Exception as exc:
+                event_queue.put(("error", str(exc)))
 
         threading.Thread(target=produce, daemon=True).start()
 
+        sid = request.session_id or ""
+        sources: list[str] = []
         while True:
-            kind, payload = await asyncio.to_thread(event_queue.get)
+            try:
+                kind, payload = await asyncio.to_thread(event_queue.get, True, 90)
+            except queue.Empty:
+                yield f"data: {json.dumps({'token': 'Sorry, that took too long on this machine. Try a shorter question.'})}\n\n"
+                yield f"data: {json.dumps({'done': True, 'session_id': sid or 'timeout', 'sources': sources})}\n\n"
+                break
+            if kind == "meta":
+                assert isinstance(payload, dict)
+                sid = str(payload.get("session_id") or sid)
+                sources = list(payload.get("sources") or [])
+                continue
+            if kind == "error":
+                yield f"data: {json.dumps({'token': f'Sorry, generation failed: {payload}'})}\n\n"
+                yield f"data: {json.dumps({'done': True, 'session_id': sid or 'error', 'sources': sources})}\n\n"
+                break
             if kind == "token":
                 yield f"data: {json.dumps({'token': payload})}\n\n"
                 continue

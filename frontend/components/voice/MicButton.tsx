@@ -8,6 +8,7 @@ interface MicButtonProps {
   onListeningStart?: () => void;
   onListeningEnd?: () => void;
   onListeningCancel?: () => void;
+  variant?: "default" | "input" | "glass" | "dock";
 }
 
 export default function MicButton({
@@ -16,6 +17,7 @@ export default function MicButton({
   onListeningStart,
   onListeningEnd,
   onListeningCancel,
+  variant = "default",
 }: MicButtonProps) {
   const { isRecording, error, startRecording, stopRecording } = useVoiceRecorder();
 
@@ -40,6 +42,13 @@ export default function MicButton({
     }
   };
 
+  const idleClass =
+    variant === "input"
+      ? "bg-violet-600 text-white shadow-sm shadow-violet-600/25 hover:bg-violet-500"
+      : variant === "glass" || variant === "dock"
+        ? "bg-white/15 text-white hover:bg-white/25"
+        : "text-slate-500 hover:bg-white hover:text-violet-600";
+
   return (
     <div className="relative">
       <button
@@ -47,16 +56,25 @@ export default function MicButton({
         onClick={handleClick}
         disabled={disabled}
         title={isRecording ? "Click to stop & send" : "Click mic, speak, click again to send"}
-        className={`rounded-full p-3 transition-colors ${
+        aria-pressed={isRecording}
+        className={`relative rounded-full p-2.5 transition ${
           isRecording
-            ? "bg-red-500 text-white animate-pulse"
-            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            ? "bg-red-500 text-white shadow-sm shadow-red-500/30"
+            : idleClass
         } disabled:opacity-50`}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        {isRecording && (
+          <span className="absolute inset-0 animate-ping rounded-full bg-red-400/40" />
+        )}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="relative">
           <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92h-2z" />
         </svg>
       </button>
+      {isRecording && (
+        <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600">
+          Recording
+        </span>
+      )}
       {error && (
         <span className="absolute bottom-full left-0 mb-2 max-w-xs rounded-lg bg-red-50 px-2 py-1 text-xs text-red-600 shadow-sm">
           {error}

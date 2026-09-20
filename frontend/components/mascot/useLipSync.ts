@@ -41,21 +41,21 @@ export function useLipSync() {
 
         // Attack is fast (open mouth quickly); release is slower (looks more natural)
         const target = Math.min(1, Math.max(0, level));
-        const attack = 18;
+        const attack = 28;
         const release = 9;
         const rate = target > envelopeRef.current ? attack : release;
         envelopeRef.current +=
           (target - envelopeRef.current) * (1 - Math.exp(-rate * dt));
 
         // Micro-variation so continuous speech doesn't look locked open
-        phaseRef.current += dt * 12;
+        phaseRef.current += dt * 16;
         const flutter =
-          1 + Math.sin(phaseRef.current) * 0.06 * envelopeRef.current;
+          1 + Math.sin(phaseRef.current) * 0.08 * envelopeRef.current;
 
-        const mouthOpen = Math.min(1, envelopeRef.current * 1.15 * flutter);
+        const mouthOpen = Math.min(1, Math.max(0, envelopeRef.current * 1.55 * flutter));
 
         // Narrower mouth on quieter / closed moments; wider when open (vowel-like)
-        const widthTarget = 0.85 + mouthOpen * 0.35;
+        const widthTarget = 0.82 + mouthOpen * 0.42;
         widthRef.current +=
           (widthTarget - widthRef.current) * (1 - Math.exp(-10 * dt));
 

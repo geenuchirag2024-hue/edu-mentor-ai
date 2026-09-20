@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
-import MentorFace, { type MentorFaceHandle } from "./MentorFace";
-import MascotStatusRing from "./MascotStatusRing";
+import MentorFace, {
+  type MentorExpression,
+  type MentorFaceHandle,
+} from "./MentorFace";
+import MascotStatusRing, { SpeakingWaveform } from "./MascotStatusRing";
 import {
   EMOTION_LABELS,
   STATE_LABELS,
@@ -19,8 +22,25 @@ interface MascotAvatarProps {
   audioLevelRef?: MutableRefObject<number>;
   audioLevel?: number;
   compact?: boolean;
+  size?: number;
+  /** Fill the parent; portrait uses object-fit: contain (2:3). */
+  fill?: boolean;
   showLabel?: boolean;
   className?: string;
+}
+
+function resolveExpression(
+  state: MascotState,
+  emotion: MascotEmotion
+): MentorExpression {
+  if (state === "speaking") return "idle";
+  if (state === "listening") return "listen";
+  if (state === "thinking") return "think";
+  if (emotion === "sad") return "concern";
+  if (emotion === "happy" || emotion === "greeting") return "happy";
+  if (emotion === "thinking") return "think";
+  if (emotion === "confident") return "listen";
+  return "idle";
 }
 
 export default function MascotAvatar({
@@ -30,6 +50,8 @@ export default function MascotAvatar({
   audioLevelRef,
   audioLevel = 0,
   compact = false,
+  size,
+  fill = false,
   showLabel = true,
   className = "",
 }: MascotAvatarProps) {
@@ -39,9 +61,7 @@ export default function MascotAvatar({
   const wasSpeakingRef = useRef(false);
 
   useEffect(() => {
-    if (!audioLevelRef) {
-      localLevelRef.current = audioLevel;
-    }
+    if (!audioLevelRef) localLevelRef.current = audioLevel;
   }, [audioLevel, audioLevelRef]);
 
   const readLevel = useCallback(() => {
@@ -66,11 +86,29 @@ export default function MascotAvatar({
 
   useMascotAnimation({ state, emotion, gesture, getLipSync, onPose });
 
-  const size = compact ? 120 : 220;
+  const width = size ?? (compact ? 140 : 300);
   const caption =
     EMOTION_LABELS[emotion] && state === "idle"
       ? EMOTION_LABELS[emotion]
       : STATE_LABELS[state];
+
+  const statusTone =
+    state === "listening"
+      ? "text-emerald-600"
+      : state === "thinking"
+        ? "text-amber-600"
+        : state === "speaking"
+          ? "text-indigo-600"
+          : "text-slate-500";
+
+  const dotTone =
+    state === "listening"
+      ? "bg-emerald-500"
+      : state === "thinking"
+        ? "bg-amber-400"
+        : state === "speaking"
+          ? "bg-indigo-500"
+          : "bg-slate-300";
 
   return (
     <div
@@ -79,44 +117,46 @@ export default function MascotAvatar({
       data-mascot-emotion={emotion}
       data-mascot-gesture={gesture}
     >
-      <div
-        className="relative flex items-center justify-center"
-        style={{ width: size, height: size }}
-      >
-        <MascotStatusRing state={state} />
-        <MentorFace ref={faceRef} size={size} className="relative z-10" />
-      </div>
-
       {showLabel && (
-        <div className={`text-center ${compact ? "mt-1" : "mt-3"}`}>
+        <div className={`text-center ${compact ? "mb-1" : "mb-2"}`}>
           <p
-            className={`font-semibold text-slate-800 ${
-              compact ? "text-sm" : "text-base"
+            className={`font-semibold tracking-tight text-slate-800 ${
+              compact ? "text-sm" : "text-[15px]"
             }`}
           >
             Mentor Mira
           </p>
           <p
-            className={`capitalize transition-colors duration-300 ${
-              compact ? "text-[11px]" : "text-xs"
-            } ${
-              state === "listening"
-                ? "text-emerald-600"
-                : state === "thinking"
-                  ? "text-amber-600"
-                  : state === "speaking"
-                    ? "text-indigo-600"
-                    : emotion === "happy" || emotion === "greeting"
-                      ? "text-emerald-600"
-                      : emotion === "sad"
-                        ? "text-sky-600"
-                        : "text-slate-500"
-            }`}
+            className={`mt-0.5 flex items-center justify-center gap-1.5 ${compact ? "text-[11px]" : "text-xs"} ${statusTone}`}
           >
+            <span className={`inline-block h-1.5 w-1.5 rounded-full ${dotTone} ${state !== "idle" ? "mira-status-pulse" : ""}`} />
             {caption}
+            <SpeakingWaveform
+              active={state === "speaking"}
+              audioLevelRef={audioLevelRef}
+            />
           </p>
         </div>
       )}
+
+      <div
+        className={`mira-presence ${fill ? "mira-presence-fill" : ""} ${
+          state === "speaking" ? "mira-presence-speak" : ""
+        } ${state === "listening" ? "mira-presence-listen" : ""}`}
+        style={
+          fill
+            ? undefined
+            : { width, height: Math.round(width * 1.5) }
+        }
+      >
+        <MascotStatusRing state={state} audioLevelRef={audioLevelRef} />
+        <MentorFace
+          ref={faceRef}
+          size={fill ? undefined : width}
+          expression={resolveExpression(state, emotion)}
+          className="relative z-10"
+        />
+      </div>
     </div>
   );
 }

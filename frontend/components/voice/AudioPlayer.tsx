@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
 export interface AudioPlayerHandle {
   play: (base64: string) => void;
@@ -9,21 +9,13 @@ export interface AudioPlayerHandle {
 }
 
 interface AudioPlayerProps {
-  /** Fired when playback finishes or is stopped / errors. */
   onEnded?: () => void;
-  /**
-   * Real-time amplitude (0–1) while audio plays — used for lip-sync.
-   * Called from requestAnimationFrame; keep the handler light.
-   */
   onAudioLevel?: (level: number) => void;
+  onProgress?: (current: number, duration: number) => void;
 }
 
-/**
- * Hidden HTMLAudioElement wrapper with optional Web Audio analysis.
- * Does not change any backend APIs — only exposes amplitude for the mascot.
- */
-const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
-  function AudioPlayer({ onEnded, onAudioLevel }, ref) {
+    const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
+  function AudioPlayer({ onEnded, onAudioLevel, onProgress }, ref) {
     const audioRef = useRef<HTMLAudioElement>(null);
     const ctxRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
@@ -34,36 +26,37 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
     onAudioLevelRef.current = onAudioLevel;
     const onEndedRef = useRef(onEnded);
     onEndedRef.current = onEnded;
+    const onProgressRef = useRef(onProgress);
+    onProgressRef.current = onProgress;
 
-    /** Attach AnalyserNode once per media element (MediaElementSource can only be created once). */
     const ensureAnalyser = () => {
       const el = audioRef.current;
       if (!el || !onAudioLevelRef.current) return;
 
       if (!ctxRef.current) {
-        const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const Ctx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         ctxRef.current = new Ctx();
       }
 
       const ctx = ctxRef.current;
-      if (ctx.state === "suspended") {
-        void ctx.resume();
-      }
+      if (ctx.state === "suspended") void ctx.resume();
 
       if (!sourceRef.current) {
         const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.55;
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.35;
         const source = ctx.createMediaElementSource(el);
         source.connect(analyser);
         analyser.connect(ctx.destination);
         analyserRef.current = analyser;
         sourceRef.current = source;
-        dataRef.current = new Uint8Array(analyser.frequencyBinCount);
+        // Time-domain buffer must match fftSize (not frequencyBinCount).
+        dataRef.current = new Uint8Array(analyser.fftSize);
       }
     };
 
-    /** Sample RMS-like energy from the analyser each animation frame. */
     const startLevelLoop = () => {
       if (rafRef.current != null) return;
 
@@ -71,18 +64,21 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         const analyser = analyserRef.current;
         const data = dataRef.current;
         if (analyser && data && onAudioLevelRef.current) {
-          // time-domain samples give a smoother mouth envelope than raw bins
-          // Cast keeps TS happy across DOM lib variants for getByteTimeDomainData
           analyser.getByteTimeDomainData(data as never);
           let sum = 0;
+          let peak = 0;
           for (let i = 0; i < data.length; i++) {
             const v = (data[i] - 128) / 128;
             sum += v * v;
+            const a = Math.abs(v);
+            if (a > peak) peak = a;
           }
           const rms = Math.sqrt(sum / data.length);
-          // Soft curve so quiet speech still moves the mouth a bit
-          const level = Math.min(1, Math.pow(rms * 2.8, 0.7));
-          onAudioLevelRef.current(level);
+          // Mix RMS + peak so TTS consonants still drive the mouth.
+          const energy = Math.max(rms * 1.55, peak * 0.9);
+          const gated =
+            energy < 0.012 ? 0 : Math.min(1, Math.pow(energy * 11.5, 0.52));
+          onAudioLevelRef.current(gated);
         }
         rafRef.current = requestAnimationFrame(tick);
       };
@@ -98,10 +94,32 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       onAudioLevelRef.current?.(0);
     };
 
+    const emitProgress = () => {
+      const el = audioRef.current;
+      if (!el) return;
+      const duration = Number.isFinite(el.duration) ? el.duration : 0;
+      onProgressRef.current?.(el.currentTime, duration);
+    };
+
     const handleEnded = () => {
       stopLevelLoop();
+      const el = audioRef.current;
+      const duration = el && Number.isFinite(el.duration) ? el.duration : 1;
+      onProgressRef.current?.(duration, duration);
       onEndedRef.current?.();
     };
+
+    useEffect(() => {
+      return () => {
+        stopLevelLoop();
+        if (ctxRef.current && ctxRef.current.state !== "closed") {
+          void ctxRef.current.close();
+        }
+        ctxRef.current = null;
+        sourceRef.current = null;
+        analyserRef.current = null;
+      };
+    }, []);
 
     useImperativeHandle(ref, () => ({
       play(base64: string) {
@@ -110,6 +128,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         stopLevelLoop();
         el.src = `data:audio/wav;base64,${base64}`;
         el.load();
+        onProgressRef.current?.(0, 0);
         ensureAnalyser();
 
         const attempt = el.play();
@@ -117,7 +136,6 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
           attempt
             .then(() => startLevelLoop())
             .catch(() => {
-              // Browser autoplay block — retry once after a short delay
               setTimeout(() => {
                 el.play()
                   .then(() => startLevelLoop())
@@ -144,6 +162,8 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
         crossOrigin="anonymous"
         onEnded={handleEnded}
         onError={handleEnded}
+        onTimeUpdate={emitProgress}
+        onLoadedMetadata={emitProgress}
       />
     );
   }

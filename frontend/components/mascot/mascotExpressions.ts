@@ -1,8 +1,8 @@
 import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
 
 /**
- * Facial pose values applied by the 60 FPS animation loop.
- * Units are relative offsets / scales used by MentorFace SVG parts.
+ * Facial pose values applied by the animation loop.
+ * Offsets are relative units consumed by MentorFace (CSS transforms + visemes).
  */
 export interface FacialPose {
   /** Mouth openness 0 (closed) → 1 (wide open) */
@@ -83,8 +83,8 @@ export const STATE_POSES: Record<MascotState, Partial<FacialPose>> = {
     blush: 0.05,
   },
   speaking: {
-    mouthOpen: 0.2,
-    mouthWidth: 1.05,
+    mouthOpen: 0,
+    mouthWidth: 1.02,
     smile: 0.45,
     browRaise: -0.8,
     eyeOpen: 1,
@@ -177,9 +177,9 @@ export const DEFAULT_POSE: FacialPose = {
 /** Status copy shown under the mascot name. */
 export const STATE_LABELS: Record<MascotState, string> = {
   idle: "Ready to help",
-  listening: "Listening…",
-  thinking: "Thinking…",
-  speaking: "Speaking…",
+  listening: "Listening...",
+  thinking: "Thinking...",
+  speaking: "Speaking...",
 };
 
 export const EMOTION_LABELS: Partial<Record<MascotEmotion, string>> = {

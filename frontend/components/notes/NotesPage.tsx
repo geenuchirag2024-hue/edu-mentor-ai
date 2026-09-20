@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import MascotAvatar from "@/components/mascot/MascotAvatar";
+import MiraStage from "@/components/mascot/MiraStage";
 import { getLearnerId, getNotesSessionId } from "@/services/learner";
 import { askNotes, listNotes, uploadNotes } from "@/services/tutorService";
 import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
@@ -80,9 +80,9 @@ export default function NotesPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto py-4 md:flex-row">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto md:flex-row">
       <div className="min-w-0 flex-1 space-y-4">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="glass-panel p-5">
           <h2 className="text-lg font-semibold">PDF / Notes Tutor</h2>
           <p className="mt-1 text-sm text-slate-500">
             Upload lecture notes or a PDF, then ask questions grounded in your material.
@@ -108,7 +108,7 @@ export default function NotesPage() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="glass-panel p-5">
           <label className="text-sm font-medium">Ask about your notes</label>
           <textarea
             className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
@@ -139,10 +139,13 @@ export default function NotesPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>
 
-      <aside className="flex w-full shrink-0 flex-col items-center md:w-64">
-        <div className="rounded-3xl bg-gradient-to-b from-slate-50 to-indigo-50/60 px-4 py-6 shadow-sm ring-1 ring-slate-200/80">
-          <MascotAvatar state={mascotState} emotion={emotion} gesture={gesture} />
-        </div>
+      <aside className="w-full shrink-0 md:w-80">
+        <MiraStage
+          state={mascotState}
+          emotion={emotion}
+          gesture={gesture}
+          size={220}
+        />
       </aside>
     </div>
   );

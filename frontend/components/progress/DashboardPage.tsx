@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import MascotAvatar from "@/components/mascot/MascotAvatar";
+import MiraStage from "@/components/mascot/MiraStage";
 import { getLearnerId } from "@/services/learner";
 import { fetchProgress } from "@/services/tutorService";
 import type { ProgressDashboard } from "@/types/tutor";
@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const gesture = data.streak_days >= 3 ? "celebrate" : "wave";
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto py-4 md:flex-row">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto md:flex-row">
       <div className="min-w-0 flex-1 space-y-4">
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label={`${data.streak_days} day streak`} value="🔥 Streak" />
@@ -38,7 +38,7 @@ export default function DashboardPage() {
           <Stat label={`Level ${data.level}`} value={`${data.xp} XP`} />
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="glass-panel p-5">
           <h2 className="font-semibold text-slate-800">Level progress</h2>
           <p className="mt-1 text-sm text-slate-500">
             {data.xp_into_level} / {data.xp_per_level} XP to the next level
@@ -54,7 +54,7 @@ export default function DashboardPage() {
           </p>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="glass-panel p-5">
           <h2 className="font-semibold text-slate-800">Your learning</h2>
           {data.topics.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="glass-panel p-5">
           <h2 className="font-semibold text-slate-800">Badges</h2>
           {data.badges.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">
@@ -111,17 +111,8 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      <aside className="flex w-full shrink-0 flex-col items-center md:w-64">
-        <div className="rounded-3xl bg-gradient-to-b from-slate-50 to-indigo-50/60 px-4 py-6 shadow-sm ring-1 ring-slate-200/80">
-          <MascotAvatar
-            state="idle"
-            emotion={emotion}
-            gesture={gesture}
-          />
-        </div>
-        <p className="mt-3 max-w-[16rem] text-center text-xs text-slate-500">
-          {data.quizzes_completed} quizzes · {data.interviews_completed} interviews
-        </p>
+      <aside className="w-full shrink-0 md:w-80">
+        <MiraStage state="idle" emotion={emotion} gesture={gesture} size={220} />
       </aside>
     </div>
   );
@@ -129,7 +120,7 @@ export default function DashboardPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <div className="glass-panel px-4 py-3">
       <p className="text-xs text-slate-500">{value}</p>
       <p className="mt-1 text-lg font-semibold text-slate-800">{label}</p>
     </div>

@@ -35,15 +35,24 @@ EMOJI_PATTERN = re.compile(
     flags=re.UNICODE,
 )
 
+THINK_BLOCK = re.compile(r"<think>.*?</think>", flags=re.IGNORECASE | re.DOTALL)
+MAX_SPEECH_CHARS = 720
+
 
 def prepare_text_for_speech(text: str) -> str:
     """Return text suitable for TTS — no emojis, expanded abbreviations."""
-    spoken = EMOJI_PATTERN.sub("", text)
+    spoken = THINK_BLOCK.sub(" ", text)
+    spoken = re.sub(r"</?think>", " ", spoken, flags=re.IGNORECASE)
+    spoken = EMOJI_PATTERN.sub("", spoken)
     spoken = re.sub(r"[*_#`~\[\]]", "", spoken)
+    spoken = re.sub(r"</?[^>]+>", " ", spoken)
 
     for pattern, replacement in ABBREVIATIONS.items():
         spoken = re.sub(pattern, replacement, spoken, flags=re.IGNORECASE)
 
-    # Collapse extra whitespace
     spoken = re.sub(r"\s+", " ", spoken).strip()
+    if len(spoken) > MAX_SPEECH_CHARS:
+        clipped = spoken[:MAX_SPEECH_CHARS]
+        end = max(clipped.rfind("."), clipped.rfind("?"), clipped.rfind("!"))
+        spoken = clipped[: end + 1] if end >= 80 else clipped
     return spoken

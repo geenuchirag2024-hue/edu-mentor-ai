@@ -3,7 +3,9 @@
  * Chat UI should import from here when possible.
  */
 export { default as MascotAvatar } from "./MascotAvatar";
+export { default as MiraStage } from "./MiraStage";
 export { default as MentorFace } from "./MentorFace";
+export type { MentorExpression, MentorFaceHandle } from "./MentorFace";
 export { default as MascotStatusRing } from "./MascotStatusRing";
 export { useMascotState } from "./useMascotState";
 export { useLipSync } from "./useLipSync";
