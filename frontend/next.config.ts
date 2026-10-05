@@ -7,7 +7,7 @@ const backendUrl =
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  output: "standalone",
+  output: process.env.VERCEL ? undefined : "standalone",
   async rewrites() {
     // fallback = only if there is no local App Router handler.
     // /api/chat/stream is a local SSE proxy so Next must not buffer it.
