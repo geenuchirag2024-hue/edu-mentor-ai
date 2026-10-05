@@ -25,8 +25,13 @@ export interface StreamChatCallbacks {
 function chatStreamUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (explicit) return `${explicit}/api/chat/stream`;
-  // Hit FastAPI directly so Next.js rewrites cannot buffer SSE (which hid Mira's reply).
-  if (typeof window !== "undefined") {
+  // Hit FastAPI directly on localhost so Next.js rewrites cannot buffer SSE.
+  // In production (e.g. Vercel), fallback to relative SSE route proxied by Next.js.
+  if (
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1")
+  ) {
     return "http://127.0.0.1:8000/api/chat/stream";
   }
   return "/api/chat/stream";
