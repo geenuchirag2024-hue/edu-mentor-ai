@@ -18,7 +18,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     cors_origins: str = (
         "http://localhost:3000,http://localhost:3001,"
-        "http://127.0.0.1:3000,http://127.0.0.1:3001"
+        "http://127.0.0.1:3000,http://127.0.0.1:3001,"
+        "https://edu-mentor-ai-sable.vercel.app,"
+        "https://edu-mentor-ai-git-main-chethanchiragk.vercel.app,"
+        "https://edu-mentor-lr3lcbzog-chethanchiragk.vercel.app"
     )
 
     llm_model_path: str = str(PROJECT_ROOT / "data/models/qwen3.gguf")
