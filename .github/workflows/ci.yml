@@ -35,7 +35,7 @@ jobs:
           node-version: "20"
       - name: Install and build
         run: |
-          npm ci
+          npm ci --prefix .
           npm run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
