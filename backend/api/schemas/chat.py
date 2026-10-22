@@ -13,6 +13,8 @@ class ChatRequest(BaseModel):
     hint_level: int = Field(default=0, ge=0, le=3)
     learner_id: str | None = None
     use_notes: bool = False
+    subject: str = "Machine Learning"
+
 
 
 class ChatResponse(BaseModel):

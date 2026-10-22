@@ -1,0 +1,54 @@
+# Database Management Systems (DBMS) Fundamentals
+
+## 1. Database Fundamentals and the Relational Model
+A Database Management System (DBMS) is system software designed to create, maintain, query, and administer structured databases. The Relational Model, introduced by Edgar F. Codd, represents data as relations (tables).
+- Relations and Attributes: A relation consists of rows (tuples) representing records and columns (attributes) representing properties. The domain specifies valid values for an attribute.
+- Relational Schema: Defines the structure, attribute names, data types, and integrity constraints of a relation.
+- Entity-Relationship (ER) Modeling: Visualizes real-world entities, entity sets, attributes, and relationships (one-to-one, one-to-many, many-to-many).
+
+## 2. Relational Keys and Integrity Constraints
+Keys uniquely identify tuples within relations and enforce relational integrity across tables.
+- Super Key: A set of one or more attributes that collectively identify a tuple uniquely in a relation.
+- Candidate Key: A minimal super key—a super key having no proper subset that is also a super key. A relation may possess multiple candidate keys.
+- Primary Key: A candidate key chosen by the database designer as the principal identifier for tuples in a table. It cannot contain NULL values (Entity Integrity constraint).
+- Alternate Key: Any candidate key that was not chosen as the primary key.
+- Foreign Key: An attribute or collection of attributes in one relation whose values match a candidate/primary key in another relation. Enforces Referential Integrity constraints (preventing orphan records, cascading updates/deletes).
+- Domain and Check Constraints: Restrict allowable attribute values (e.g., NOT NULL, UNIQUE, CHECK (age >= 18), DEFAULT).
+
+## 3. Functional Dependencies and Normalization
+Normalization is a systematic database design technique that decomposes tables to eliminate data redundancy, insertion anomalies, update anomalies, and deletion anomalies.
+- Functional Dependency (FD): Denoted X -> Y, meaning attribute set X uniquely determines attribute set Y. Armstrong's Axioms (Reflexivity, Augmentation, Transitivity) govern functional dependency derivations.
+- First Normal Form (1NF): Every attribute value must be atomic (indivisible) and each tuple must have a distinct primary key without repeating groups.
+- Second Normal Form (2NF): Relation must be in 1NF and have no partial dependencies—every non-prime attribute must depend on the whole candidate key, not just a subset.
+- Third Normal Form (3NF): Relation must be in 2NF and have no transitive dependencies—non-prime attributes must not depend on other non-prime attributes. For every non-trivial FD X -> Y, X is a super key or Y is a prime attribute.
+- Boyce-Codd Normal Form (BCNF): A stricter version of 3NF. For every non-trivial functional dependency X -> Y, X must strictly be a super key.
+
+## 4. Structured Query Language (SQL), Joins, and Constraints
+SQL is the declarative domain-specific language for relational database management.
+- DDL (Data Definition Language): CREATE, ALTER, DROP, TRUNCATE.
+- DML (Data Manipulation Language): INSERT, UPDATE, DELETE, SELECT.
+- DCL and TCL: GRANT, REVOKE, COMMIT, ROLLBACK, SAVEPOINT.
+- SQL Joins:
+  - INNER JOIN: Returns rows when matching values exist in both tables.
+  - LEFT (OUTER) JOIN: Returns all rows from the left table and matched rows from the right table (NULL if no match).
+  - RIGHT (OUTER) JOIN: Returns all rows from the right table and matched rows from the left table.
+  - FULL (OUTER) JOIN: Returns all rows when there is a match in either left or right table.
+  - CROSS JOIN: Cartesian product of both tables.
+- Aggregations and Grouping: GROUP BY groups records based on common column values; HAVING filters aggregated groups (unlike WHERE which filters individual rows).
+
+## 5. Transactions and ACID Properties
+A database transaction is a logical unit of work consisting of one or more SQL operations executed as an indivisible sequence.
+- Atomicity: "All or nothing." If any statement fails, the entire transaction is rolled back to preserve database state.
+- Consistency: Transactions bring the database from one valid state satisfying all schema constraints to another valid state.
+- Isolation: Concurrent transactions execute without interfering with one another. Isolation levels include Read Uncommitted, Read Committed, Repeatable Read, and Serializable.
+- Durability: Once a transaction commits, its modifications are permanently recorded on non-volatile storage, surviving power failures and system crashes via Write-Ahead Logging (WAL).
+
+## 6. Indexing, Concurrency Control, and Recovery
+- Indexing: Auxiliary data structures that accelerate record retrieval.
+  - B-Trees and B+ Trees: Balanced multi-way search trees providing O(log n) lookups, insertions, deletions, and fast range scans. B+ Trees store all actual record pointers in leaf nodes linked sequentially.
+  - Hash Indexes: O(1) point lookups based on hash functions, but unsuitable for range queries.
+  - Clustered Index: Determines physical ordering of data on disk (only one clustered index per table, typically the primary key). Non-clustered (secondary) indexes contain pointers to row locators.
+- Concurrency Control: Prevents race conditions like dirty reads, non-repeatable reads, and phantom reads.
+  - Two-Phase Locking (2PL): Growing phase (locks acquired, none released) and shrinking phase (locks released, none acquired). Strict 2PL holds exclusive locks until transaction commit.
+  - Deadlocks: Situations where transactions wait cyclically for locks held by each other. Detected via wait-for graphs and resolved by aborting and rolling back a victim transaction.
+- Recovery Techniques: Log-based recovery using Write-Ahead Logging (WAL). Checkpointing reduces recovery overhead by guaranteeing dirty pages prior to the checkpoint are safely flushed to disk. During crash recovery, the DBMS executes ARIES: Analysis, Redo (repeating history), and Undo (rolling back uncommitted transactions).

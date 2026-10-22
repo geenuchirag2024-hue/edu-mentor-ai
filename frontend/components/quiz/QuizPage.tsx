@@ -7,11 +7,18 @@ import { generateQuiz, gradeQuiz, requestHint } from "@/services/tutorService";
 import type { QuizGradeResult, QuizPayload } from "@/types/tutor";
 import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
 
-const SUBJECTS = ["Machine Learning", "Python", "Deep Learning", "Neural Networks"];
+const SUBJECTS = ["Machine Learning", "DBMS", "Deep Learning"];
+
+const DEFAULT_TOPICS: Record<string, string> = {
+  "Machine Learning": "Decision Trees",
+  "DBMS": "Relational Models & Normalization",
+  "Deep Learning": "Neural Networks & Backpropagation",
+};
 
 export default function QuizPage() {
   const [subject, setSubject] = useState("Machine Learning");
   const [topic, setTopic] = useState("Decision Trees");
+
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "auto">(
     "auto"
   );
@@ -132,12 +139,17 @@ export default function QuizPage() {
                 <select
                   className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2"
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setSubject(next);
+                    if (DEFAULT_TOPICS[next]) setTopic(DEFAULT_TOPICS[next]);
+                  }}
                 >
                   {SUBJECTS.map((s) => (
                     <option key={s}>{s}</option>
                   ))}
                 </select>
+
               </label>
               <label className="text-sm">
                 Topic

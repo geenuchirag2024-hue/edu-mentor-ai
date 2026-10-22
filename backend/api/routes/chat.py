@@ -35,6 +35,7 @@ async def chat(
         request.hint_level,
         authenticated_learner_id,
         request.use_notes,
+        request.subject,
     )
     return ChatResponse(
         answer=result["answer"],
@@ -66,7 +67,9 @@ async def chat_stream(
                     request.hint_level,
                     authenticated_learner_id,
                     request.use_notes,
+                    request.subject,
                 )
+
                 event_queue.put(("meta", {"session_id": sid, "sources": sources}))
                 answer_parts: list[str] = []
                 for token in token_iter:

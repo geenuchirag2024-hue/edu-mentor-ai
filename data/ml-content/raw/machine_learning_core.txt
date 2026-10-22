@@ -1,0 +1,34 @@
+# Machine Learning Core Concepts and Algorithms
+
+## 1. Introduction to Machine Learning
+Machine Learning (ML) is the scientific study of algorithms and statistical models that computer systems use to perform specific tasks without explicit instructions, relying instead on patterns and inference derived from sample data. The learning paradigm is categorized primarily into supervised learning, unsupervised learning, semi-supervised learning, and reinforcement learning.
+
+## 2. Supervised Learning
+In supervised learning, algorithms are provided with labeled training data consisting of input features (X) and corresponding ground-truth target outputs (y). The objective is to learn a mapping function f: X -> y that generalizes accurately to unseen instances.
+- Classification: The target variable y is discrete or categorical. Common tasks include spam detection (binary classification) and medical diagnosis (multi-class classification). Common algorithms include Logistic Regression, Support Vector Machines (SVM), k-Nearest Neighbors (k-NN), Decision Trees, and Naive Bayes.
+- Regression: The target variable y is continuous. Examples include predicting real-estate prices, stock returns, and temperature forecasting. Common algorithms include Ordinary Least Squares (OLS) Linear Regression, Ridge Regression (L2 regularization), Lasso Regression (L1 regularization), and ElasticNet.
+
+## 3. Decision Trees and Random Forests
+- Decision Trees: Non-parametric supervised learning models that partition feature space using recursive binary splitting. At each internal node, a split is chosen that maximizes class purity. For classification, purity is quantified using Entropy and Information Gain (as in ID3/C4.5) or Gini Impurity (as in CART). Information gain is defined as the entropy of the parent node minus the weighted sum of child node entropies. Deep unconstrained decision trees suffer from high variance and severe overfitting, which is mitigated via pre-pruning (limiting maximum tree depth, minimum leaf samples) or post-pruning (cost-complexity pruning).
+- Random Forests: An ensemble learning method based on bootstrap aggregating (bagging) and feature sub-sampling. Random Forests construct an ensemble of de-correlated decision trees. Each tree is trained on a bootstrap sample drawn with replacement from the training dataset. During node splitting, only a random subset of features (typically square root of total features for classification) is considered. The final prediction is aggregate majority vote for classification or average for regression. This drastically reduces model variance without increasing bias.
+
+## 4. Unsupervised Learning and Clustering
+Unsupervised learning models uncover latent structure, clusters, and representations from unlabeled datasets.
+- K-Means Clustering: A centroid-based partitioning algorithm that partitions n observations into k clusters where each observation belongs to the cluster with the nearest centroid (mean). The algorithm alternates between assigning data points to nearest centroids and recalculating centroids until convergence. Centroid initialization affects results; K-Means++ improves convergence by probabilistically scattering initial centers.
+- Hierarchical Clustering: Agglomerative (bottom-up) builds a cluster hierarchy represented as a dendrogram by iteratively merging the closest cluster pairs using linkage criteria (single, complete, average, or Ward's minimum variance).
+- Dimensionality Reduction: Principal Component Analysis (PCA) performs an orthogonal linear transformation to project high-dimensional data onto lower-dimensional principal components that maximize variance and eliminate multicollinearity.
+
+## 5. Overfitting, Underfitting, and the Bias-Variance Tradeoff
+- Underfitting (High Bias): Occurs when a model is overly simplistic to capture underlying data trends, producing high error on both training and test sets. Remediated by increasing model complexity, engineering more informative features, or reducing regularization.
+- Overfitting (High Variance): Occurs when a model learns noise and idiosyncratic fluctuations in training data rather than underlying population patterns, yielding near-zero training error but poor generalization. Remediated by cross-validation, regularization (L1/L2 penalties), pruning, dropout, or acquiring more diverse training data.
+- Bias-Variance Tradeoff: Total expected generalization error decomposes into Bias^2 + Variance + Irreducible Error. Optimal models balance complexity to minimize total error.
+
+## 6. Evaluation Metrics
+- Classification Metrics:
+  - Accuracy: Ratio of correct predictions to total predictions; deceptive on imbalanced datasets.
+  - Confusion Matrix: Tabulates True Positives (TP), False Positives (FP), True Negatives (TN), and False Negatives (FN).
+  - Precision: TP / (TP + FP). Fraction of positive identifications that were correct. Vital when false positives are costly (e.g. spam filtering).
+  - Recall (Sensitivity): TP / (TP + FN). Fraction of actual positives identified correctly. Vital when false negatives are catastrophic (e.g. disease screening).
+  - F1-Score: Harmonic mean of precision and recall: 2 * (Precision * Recall) / (Precision + Recall).
+  - ROC-AUC: Receiver Operating Characteristic curve plotting True Positive Rate against False Positive Rate across all classification thresholds. The Area Under the Curve (AUC) measures overall discriminative capability.
+- Regression Metrics: Mean Squared Error (MSE), Root Mean Squared Error (RMSE), Mean Absolute Error (MAE), and Coefficient of Determination (R-squared).

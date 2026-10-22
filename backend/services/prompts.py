@@ -42,6 +42,7 @@ def build_tutor_messages(
     tutor_mode: str | None = None,
     hint_level: int = 0,
     extra_system: str | None = None,
+    subject: str = "Machine Learning",
 ) -> list[dict[str, str]]:
     from backend.services.tutor_modes import hint_addendum, mode_addendum
 
@@ -56,9 +57,9 @@ def build_tutor_messages(
         system += TEXT_TUTOR_ADDENDUM
     if context and not is_greeting(user_message):
         system += (
-            "\n\nUse the following course material to ground your answer. "
-            "If the material does not cover the question, use general ML knowledge "
-            "and say when you are going beyond the provided material.\n\n"
+            f"\n\nUse the following course material to ground your answer. "
+            f"If the material does not cover the question, use general {subject} knowledge "
+            f"and say when you are going beyond the provided material.\n\n"
             f"COURSE MATERIAL:\n{context}"
         )
 
@@ -68,3 +69,4 @@ def build_tutor_messages(
     # Qwen3 otherwise spends the whole token budget inside <think> on CPU.
     messages.append({"role": "user", "content": f"{user_message}{NO_THINK_SUFFIX}"})
     return messages
+

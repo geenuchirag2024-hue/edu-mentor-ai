@@ -1,0 +1,46 @@
+# Deep Learning Principles and Architectures
+
+## 1. Perceptrons and Neural Networks
+Deep Learning is a subfield of machine learning based on artificial neural networks with multiple representation learning layers.
+- The Artificial Neuron (Perceptron): Conceived by Frank Rosenblatt, a single perceptron computes an affine transformation of its input vector x with weights w and bias b: z = sum(w_i * x_i) + b. A step or threshold function then maps z to binary output. A single-layer perceptron can only learn linearly separable decision boundaries and fails on non-linear problems like XOR.
+- Multi-Layer Perceptrons (MLP): Feedforward neural networks consisting of an input layer, one or more hidden layers with non-linear activation functions, and an output layer. By the Universal Approximation Theorem, a feedforward network with a single hidden layer containing finite neurons can approximate any continuous function on compact subsets of R^n, provided the activation function is non-linear.
+
+## 2. Forward Propagation and Backpropagation
+- Forward Propagation: The computational process of passing input signals through successive layers to compute intermediate activations and final network predictions y_hat.
+- Computational Graphs and the Chain Rule: The mathematical core of neural network training. By representing operations as nodes in a directed acyclic graph (DAG), gradients of the scalar loss L with respect to any intermediate weight w are calculated systematically via the multivariable chain rule: dL/dw = (dL/dy_hat) * (dy_hat/dz) * (dz/dw).
+- Backpropagation: Efficient reverse-mode automatic differentiation algorithm. After forward propagation calculates the loss, backprop propagates error signals backward from output to input layers, computing partial derivatives dL/dw and dL/db for all network parameters in O(N) operations, enabling gradient-based optimization.
+
+## 3. Activation Functions and Loss Functions
+- Non-linear Activation Functions: Essential for deep architectures because a composition of purely linear functions collapses into a single linear map:
+  - Sigmoid: sigma(z) = 1 / (1 + exp(-z)). Maps inputs to (0, 1). Suffers from the vanishing gradient problem for large |z| and non-zero-centered outputs.
+  - Hyperbolic Tangent (Tanh): tanh(z) = (exp(z) - exp(-z)) / (exp(z) + exp(-z)). Zero-centered with outputs in (-1, 1), but still saturates at extremes.
+  - Rectified Linear Unit (ReLU): f(z) = max(0, z). Solves vanishing gradient for positive values and computes fast. Can suffer from the "dying ReLU" problem where neurons remain permanently inactive.
+  - Leaky ReLU / Parametric ReLU (PReLU): Allows a small positive slope alpha for z < 0: f(z) = max(alpha * z, z).
+  - Softmax: Used in multi-class classification output layers to convert a vector of raw logits into normalized probabilities summing to 1: softmax(z)_i = exp(z_i) / sum(exp(z_j)).
+- Loss Functions:
+  - Binary Cross-Entropy (Log Loss): L = -[y * log(p) + (1 - y) * log(1 - p)] for binary targets.
+  - Categorical Cross-Entropy: L = -sum(y_i * log(p_i)) for multi-class classification.
+  - Mean Squared Error (MSE): L = (1/n) * sum((y_i - y_hat_i)^2) for regression tasks.
+
+## 4. Gradient Descent and Optimizers
+Optimization algorithms adjust model parameters theta along the negative gradient of the loss surface: theta <- theta - eta * grad(L).
+- Stochastic Gradient Descent (SGD): Computes gradients on individual training samples or mini-batches, introducing stochastic noise that helps escape saddle points and shallow local minima.
+- Momentum: Accelerates SGD in relevant directions and dampens oscillations by adding an exponentially decaying moving average of past gradients: v_t = gamma * v_{t-1} + eta * grad.
+- RMSProp: Scales the learning rate inversely by the square root of a running average of squared gradients, resolving vanishing/exploding learning rates across different parameters.
+- Adam (Adaptive Moment Estimation): Combines momentum (first moment estimate m_t) and RMSProp (second uncentered moment estimate v_t) with bias correction for early iterations. Default standard optimizer in modern deep learning.
+
+## 5. Convolutional and Recurrent Architectures
+- Convolutional Neural Networks (CNN): Specialized for grid-structured topological data like images.
+  - Convolutional Layers: Apply learnable filter kernels across spatial dimensions to detect translation-invariant visual features (edges, textures, object parts).
+  - Pooling Layers (Max Pooling / Average Pooling): Downsample feature maps, reducing spatial dimensionality, computational parameters, and providing minor translation invariance.
+  - Classic Architectures: LeNet-5, AlexNet, VGG, ResNet (introducing residual skip connections F(x) + x to train very deep networks without vanishing gradients).
+- Recurrent Neural Networks (RNN): Specialized for sequential temporal data like speech, time-series, and text.
+  - Standard RNN: Shares weights across sequence timesteps, computing hidden state h_t = tanh(W_hh * h_{t-1} + W_xh * x_t + b). Vulnerable to vanishing and exploding gradients over long horizons.
+  - Long Short-Term Memory (LSTM): Employs gating mechanisms (Forget Gate, Input Gate, Output Gate) and a dedicated Cell State to regulate long-term information flow and combat vanishing gradients.
+  - Gated Recurrent Unit (GRU): Streamlined variant merging cell and hidden states with Reset and Update gates.
+
+## 6. Attention Mechanisms and Transformers
+- Attention Mechanism: Introduced by Bahdanau and Vaswani to replace recurrent bottlenecks. Instead of compressing an entire sequence into a single fixed-length vector, attention allows the model to dynamically compute query-key similarity scores and retrieve soft weighted averages of values across all sequence positions.
+- Scaled Dot-Product Attention: Attention(Q, K, V) = softmax((Q * K^T) / sqrt(d_k)) * V, where Q (Queries), K (Keys), and V (Values) are linear projections of input embeddings.
+- Multi-Head Attention: Projects queries, keys, and values h times into distinct representation subspaces, enabling the model to jointly attend to information from different positions and representation subspaces simultaneously.
+- The Transformer Architecture: Relies entirely on self-attention without recurrence or convolutions, enabling massive parallelization during training. Incorporates Positional Encodings to preserve token order, Layer Normalization, Residual Connections, and Feed-Forward Networks. Foundation for modern Large Language Models (LLMs) such as BERT, GPT, and Qwen.

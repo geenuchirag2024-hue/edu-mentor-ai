@@ -16,7 +16,9 @@ export interface ChatRequest {
   hint_level?: number;
   learner_id?: string;
   use_notes?: boolean;
+  subject?: string;
 }
+
 
 export interface ChatResponse {
   answer: string;

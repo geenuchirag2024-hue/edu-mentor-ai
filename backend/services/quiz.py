@@ -146,6 +146,128 @@ MOCK_BANK: dict[str, list[dict]] = {
             "subtopic": "Loss Functions",
         },
     ],
+    "dbms": [
+        {
+            "type": "mcq",
+            "prompt": "Which normal form requires the elimination of transitive functional dependencies?",
+            "options": [
+                "First Normal Form (1NF)",
+                "Second Normal Form (2NF)",
+                "Third Normal Form (3NF)",
+                "Boyce-Codd Normal Form (BCNF)",
+            ],
+            "answer": "Third Normal Form (3NF)",
+            "explanation": "3NF requires a relation to be in 2NF and have no non-prime attribute transitively dependent on candidate keys.",
+            "subtopic": "Normalization",
+        },
+        {
+            "type": "mcq",
+            "prompt": "What does the 'A' in ACID properties of database transactions represent?",
+            "options": [
+                "Accuracy",
+                "Atomicity",
+                "Availability",
+                "Authentication",
+            ],
+            "answer": "Atomicity",
+            "explanation": "Atomicity guarantees that all operations within a transaction are completed or none are applied (all-or-nothing).",
+            "subtopic": "Transactions",
+        },
+        {
+            "type": "mcq",
+            "prompt": "A candidate key is best defined as:",
+            "options": [
+                "Any column that accepts integer values",
+                "A minimal super key containing no extraneous attributes",
+                "A key that references a primary key in another table",
+                "A non-unique index",
+            ],
+            "answer": "A minimal super key containing no extraneous attributes",
+            "explanation": "Candidate keys are minimal super keys that uniquely identify each tuple without redundant attributes.",
+            "subtopic": "Relational Keys",
+        },
+        {
+            "type": "true_false",
+            "prompt": "A foreign key in a relational database cannot reference a candidate key of another table.",
+            "options": ["True", "False"],
+            "answer": "False",
+            "explanation": "A foreign key can reference any candidate key or unique constraint in the target relation, though primary keys are most common.",
+            "subtopic": "Foreign Keys",
+        },
+        {
+            "type": "true_false",
+            "prompt": "In strict Two-Phase Locking (2PL), exclusive locks are held until transaction commit or abort.",
+            "options": ["True", "False"],
+            "answer": "True",
+            "explanation": "Strict 2PL avoids cascading aborts by holding all exclusive locks until the end of the transaction.",
+            "subtopic": "Concurrency Control",
+        },
+        {
+            "type": "short",
+            "prompt": "Which SQL join type returns all rows from the left table and matching rows from the right table?",
+            "options": [],
+            "answer": "LEFT JOIN / LEFT OUTER JOIN",
+            "explanation": "LEFT JOIN preserves all tuples from the left relation, padding unmatched right attributes with NULL.",
+            "subtopic": "SQL Joins",
+        },
+    ],
+    "deep learning": [
+        {
+            "type": "mcq",
+            "prompt": "Which activation function is most susceptible to the 'dying neuron' problem?",
+            "options": [
+                "Sigmoid",
+                "Tanh",
+                "Rectified Linear Unit (ReLU)",
+                "Leaky ReLU",
+            ],
+            "answer": "Rectified Linear Unit (ReLU)",
+            "explanation": "ReLU outputs zero for all negative inputs; if gradients consistently push inputs negative, neurons can permanently stop firing.",
+            "subtopic": "Activations",
+        },
+        {
+            "type": "mcq",
+            "prompt": "What is the primary architectural component of Transformer models that replaced recurrent connections?",
+            "options": [
+                "Max Pooling layers",
+                "Self-Attention mechanism",
+                "Radial Basis Functions",
+                "Markov Decision Chains",
+            ],
+            "answer": "Self-Attention mechanism",
+            "explanation": "Self-attention dynamically computes pairwise similarity weights between sequence positions, allowing parallel computation across sequences.",
+            "subtopic": "Transformers",
+        },
+        {
+            "type": "mcq",
+            "prompt": "The Adam optimizer combines the principles of which two optimization techniques?",
+            "options": [
+                "Simulated Annealing and Genetic Algorithms",
+                "Momentum and RMSProp",
+                "Line Search and Newton-Raphson",
+                "Adagrad and Coordinate Descent",
+            ],
+            "answer": "Momentum and RMSProp",
+            "explanation": "Adam computes exponentially decaying averages of past gradients (momentum) and past squared gradients (RMSProp).",
+            "subtopic": "Optimizers",
+        },
+        {
+            "type": "true_false",
+            "prompt": "A single-layer perceptron without hidden layers can compute the non-linear XOR function.",
+            "options": ["True", "False"],
+            "answer": "False",
+            "explanation": "Minsky and Papert proved that single-layer perceptrons can only classify linearly separable patterns; XOR requires at least one hidden layer.",
+            "subtopic": "Perceptrons",
+        },
+        {
+            "type": "short",
+            "prompt": "Which neural network architecture uses forget, input, and output gates to solve vanishing gradients on sequential data?",
+            "options": [],
+            "answer": "LSTM / Long Short-Term Memory",
+            "explanation": "LSTMs use explicit gating mechanisms to regulate cell state memory over extended time horizons.",
+            "subtopic": "Recurrent Architectures",
+        },
+    ],
 }
 
 
@@ -160,14 +282,34 @@ def _parse_json_payload(text: str) -> dict:
     return json.loads(cleaned[start : end + 1])
 
 
-def _bank_questions(topic: str, n: int) -> list[dict]:
-    key = topic.lower().strip()
+def _bank_questions(topic: str, n: int, subject: str = "Machine Learning") -> list[dict]:
+    t_key = topic.lower().strip()
+    s_key = subject.lower().strip()
     pool: list[dict] = []
+
+    # First attempt: match on specific topic in MOCK_BANK
     for name, qs in MOCK_BANK.items():
-        if name in key or key in name:
+        if name in t_key or t_key in name:
             pool.extend(qs)
+
+    # Second attempt: match on subject
+    if not pool:
+        for name, qs in MOCK_BANK.items():
+            if name in s_key or s_key in name:
+                pool.extend(qs)
+
+    # Subject-based routing fallbacks
+    if not pool:
+        if "dbms" in s_key or "database" in s_key or "sql" in s_key:
+            pool = MOCK_BANK.get("dbms", [])
+        elif "deep" in s_key or "neural" in s_key:
+            pool = MOCK_BANK.get("deep learning", []) or MOCK_BANK.get("neural networks", [])
+        else:
+            pool = MOCK_BANK.get("machine learning", [])
+
     if not pool:
         pool = MOCK_BANK["machine learning"]
+
     out = []
     for i, q in enumerate(pool[:n]):
         item = dict(q)
@@ -219,11 +361,24 @@ def generate_quiz(
     if difficulty not in {"easy", "medium", "hard"}:
         difficulty = "medium"
 
+    # Retrieve grounded educational material from vector store if available
+    grounding_info = ""
+    try:
+        from backend.rag.retriever import retrieve_context
+        ctx, _ = retrieve_context(f"{subject} {topic}", subject=subject)
+        if ctx:
+            grounding_info = (
+                f"\nReference Material from course curriculum:\n{ctx[:1200]}\n"
+                "Ground the question prompts, options, and explanations in this material when possible.\n"
+            )
+    except Exception:
+        grounding_info = ""
+
     prompt = f"""Generate a {difficulty} quiz as JSON only (no markdown).
 Subject: {subject}
 Topic: {topic}
 Number of questions: {n_questions}
-
+{grounding_info}
 Schema:
 {{
   "questions": [
@@ -246,7 +401,7 @@ Mix mcq, true_false, and one short answer. Keep language simple for students."""
             [
                 {
                     "role": "system",
-                    "content": "You output valid JSON quizzes for an ML tutor. No extra commentary.",
+                    "content": f"You output valid JSON quizzes for a {subject} tutor. No extra commentary.",
                 },
                 {"role": "user", "content": prompt},
             ]
@@ -257,9 +412,10 @@ Mix mcq, true_false, and one short answer. Keep language simple for students."""
         questions = []
 
     if len(questions) < 3:
-        questions = _bank_questions(topic, n_questions)
+        questions = _bank_questions(topic, n_questions, subject=subject)
         for q in questions:
             q["id"] = q.get("id") or str(uuid.uuid4())[:8]
+
 
     quiz_id = str(uuid.uuid4())
     public_questions = [

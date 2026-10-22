@@ -31,6 +31,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [tutorMode, setTutorMode] = useState<TutorMode>("teacher");
   const [hintLevel, setHintLevel] = useState(0);
+  const [subject, setSubject] = useState<string>("Machine Learning");
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
@@ -38,8 +39,11 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   tutorModeRef.current = tutorMode;
   const hintLevelRef = useRef(hintLevel);
   hintLevelRef.current = hintLevel;
+  const subjectRef = useRef(subject);
+  subjectRef.current = subject;
   const abortRef = useRef<AbortController | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+
 
   const setMascot = useCallback((state: MascotState) => {
     optionsRef.current.onStateChange?.(state);
@@ -161,11 +165,13 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
             tutor_mode: tutorModeRef.current,
             hint_level: hintLevelRef.current,
             learner_id: getLearnerId(),
+            subject: subjectRef.current,
           },
           {
             onToken: (token) => {
               fullAnswer += token;
             },
+
             onComplete: (meta) => {
               setSessionId(meta.session_id);
               sources = meta.sources;
@@ -351,6 +357,8 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     setTutorMode,
     hintLevel,
     setHintLevel,
+    subject,
+    setSubject,
     sendText,
     sendVoice,
     startListening,
@@ -360,4 +368,5 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     cancelTurn,
     playAnswerAudio,
   };
+
 }

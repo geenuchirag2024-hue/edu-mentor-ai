@@ -130,16 +130,35 @@ export default function ChatPage() {
                 <span className="h-2 w-2 rounded-full bg-emerald-500" title="Online" />
               </div>
               <p className="text-[11px] font-medium text-slate-400">
-                Your AI tutor for Machine Learning & more
+                Subject Knowledge: <span className="font-semibold text-violet-600">{assistant.subject}</span>
               </p>
             </div>
           </div>
-          <ModeSelector
-            compact
-            value={assistant.tutorMode}
-            onChange={assistant.setTutorMode}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-xl bg-slate-100/90 p-0.5 text-xs">
+              {(["Machine Learning", "DBMS", "Deep Learning"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => assistant.setSubject(s)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                    assistant.subject === s
+                      ? "bg-white text-violet-700 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <ModeSelector
+              compact
+              value={assistant.tutorMode}
+              onChange={assistant.setTutorMode}
+            />
+          </div>
         </div>
+
 
         <ChatWindow
           messages={assistant.messages}

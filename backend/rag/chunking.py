@@ -15,7 +15,8 @@ def chunk_text(
     chunk_size: int = 600,
     overlap: int = 80,
 ) -> list[str]:
-    words = clean_text(text).split()
+    cleaned = clean_text(text)
+    words = cleaned.split()
     if not words:
         return []
 
@@ -23,9 +24,11 @@ def chunk_text(
     start = 0
     while start < len(words):
         end = min(start + chunk_size, len(words))
-        chunk = " ".join(words[start:end])
-        chunks.append(chunk)
+        chunk = " ".join(words[start:end]).strip()
+        if chunk:
+            chunks.append(chunk)
         if end >= len(words):
             break
         start = max(end - overlap, start + 1)
     return chunks
+
