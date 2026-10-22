@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { AuthUser, getCurrentUser } from "@/services/authService";
 
-const LINKS = [
+const BASE_LINKS = [
   { href: "/chat", label: "Tutor", icon: TutorIcon },
   { href: "/quiz", label: "Quiz", icon: QuizIcon },
   { href: "/interview", label: "Interview", icon: InterviewIcon },
@@ -15,11 +16,24 @@ const LINKS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [panel, setPanel] = useState<"settings" | "help" | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+    const handleAuth = () => setUser(getCurrentUser());
+    window.addEventListener("edu_mentor_auth_changed", handleAuth);
+    return () => window.removeEventListener("edu_mentor_auth_changed", handleAuth);
+  }, []);
+
+  const isTeacher = user?.role === "teacher";
+  const links = isTeacher
+    ? [{ href: "/teacher", label: "Teacher", icon: TeacherIcon }, ...BASE_LINKS]
+    : BASE_LINKS;
 
   return (
     <aside className="glass-bar relative flex h-full w-[4.75rem] shrink-0 flex-col py-3 xl:w-52">
       <nav className="flex flex-1 flex-col gap-1 px-2" aria-label="Main">
-        {LINKS.map((link) => {
+        {links.map((link) => {
           const active =
             pathname === link.href || pathname.startsWith(`${link.href}/`);
           const Icon = link.icon;
@@ -70,7 +84,7 @@ export default function Sidebar() {
 
       <div className="mx-2 mt-3 hidden rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 p-3.5 text-white shadow-lg shadow-violet-500/25 xl:block">
         <p className="text-sm font-semibold leading-snug">
-          Keep Learning, Keep Growing! 🚀
+          {isTeacher ? "Empower your students! 📚" : "Keep Learning, Keep Growing! 🚀"}
         </p>
         <div className="mt-3 flex gap-1.5">
           <span className="h-1.5 w-4 rounded-full bg-white" />
@@ -97,14 +111,14 @@ export default function Sidebar() {
           {panel === "settings" ? (
             <ul className="space-y-2 text-slate-600">
               <li>Language lives in the top bar.</li>
-              <li>Mentor modes (Teacher, Quiz Master, and more) are in Tutor chat.</li>
-              <li>Hint mode is the lightbulb on Mira’s panel.</li>
+              <li>Role badge indicates current permissions.</li>
+              <li>Mentor modes are in Tutor chat.</li>
             </ul>
           ) : (
             <ul className="space-y-2 text-slate-600">
               <li>Type a question, or tap the mic, speak, then tap again to send.</li>
               <li>Use Quiz, Interview, Notes, and Progress from this sidebar.</li>
-              <li>Tap the speaker on Mira’s messages to hear an answer again.</li>
+              <li>Teachers can manage curriculum in the Teacher portal.</li>
             </ul>
           )}
         </div>
@@ -113,6 +127,14 @@ export default function Sidebar() {
   );
 }
 
+function TeacherIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5z" />
+      <path d="M6 6h10M6 10h10M6 14h6" />
+    </svg>
+  );
+}
 function TutorIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

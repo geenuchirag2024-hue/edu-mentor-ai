@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.database import Base
@@ -10,14 +10,34 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    name: Mapped[str] = mapped_column(String(255))
-    hashed_password: Mapped[str] = mapped_column(String(255))
+    full_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="student", server_default="student", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=False), server_default=func.now()
     )
 
-    sessions: Mapped[list["ChatSession"]] = relationship(back_populates="user")
+    # Backward-compatible property aliases
+    @property
+    def name(self) -> str:
+        return self.full_name
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self.full_name = value
+
+    @property
+    def hashed_password(self) -> str:
+        return self.password_hash
+
+    @hashed_password.setter
+    def hashed_password(self, value: str) -> None:
+        self.password_hash = value
+
+    sessions: Mapped[list["ChatSession"]] = relationship(
+        back_populates="user", viewonly=True
+    )
 
 
 class ChatSession(Base):

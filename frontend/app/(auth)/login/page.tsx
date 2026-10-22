@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
-import { login } from "@/services/authService";
+import React, { useEffect, useState } from "react";
+import { getCurrentUser, login } from "@/services/authService";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,14 +12,30 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // If already logged in, redirect directly to role destination
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user) {
+      if (user.role === "teacher") {
+        router.replace("/teacher");
+      } else {
+        router.replace("/chat");
+      }
+    }
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
-      await login({ email: email.trim(), password });
-      router.push("/chat");
+      const response = await login({ email: email.trim(), password });
+      if (response.user.role === "teacher") {
+        router.push("/teacher");
+      } else {
+        router.push("/chat");
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

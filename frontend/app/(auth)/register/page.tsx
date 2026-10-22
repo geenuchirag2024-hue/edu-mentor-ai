@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
-import { register } from "@/services/authService";
+import React, { useEffect, useState } from "react";
+import { getCurrentUser, register, UserRole } from "@/services/authService";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -11,8 +11,21 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<UserRole>("student");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // If already logged in, redirect directly to role destination
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user) {
+      if (user.role === "teacher") {
+        router.replace("/teacher");
+      } else {
+        router.replace("/chat");
+      }
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,12 +44,19 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await register({
+      const response = await register({
         full_name: fullName.trim(),
         email: email.trim(),
         password,
+        role,
       });
-      router.push("/chat");
+
+      // Role-based destination
+      if (response.user.role === "teacher") {
+        router.push("/teacher");
+      } else {
+        router.push("/chat");
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -55,7 +75,7 @@ export default function RegisterPage() {
           Create Account
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Join Edu-Mentor AI and start learning with your personal AI mentor
+          Join Edu-Mentor AI and start learning or teaching
         </p>
       </div>
 
@@ -70,6 +90,44 @@ export default function RegisterPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Role Selector */}
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">
+            I am a:
+          </label>
+          <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Select Role">
+            <button
+              type="button"
+              id="role-select-student"
+              onClick={() => setRole("student")}
+              className={`flex flex-col items-center justify-center gap-1 rounded-2xl border p-3.5 text-center transition ${
+                role === "student"
+                  ? "border-violet-600 bg-violet-50/80 text-violet-900 ring-2 ring-violet-500/30"
+                  : "border-slate-200 bg-white/70 text-slate-600 hover:border-slate-300 hover:bg-white"
+              }`}
+            >
+              <span className="text-xl">🎓</span>
+              <span className="text-sm font-semibold">Student</span>
+              <span className="text-[11px] text-slate-500">Learn with AI Mentors</span>
+            </button>
+
+            <button
+              type="button"
+              id="role-select-teacher"
+              onClick={() => setRole("teacher")}
+              className={`flex flex-col items-center justify-center gap-1 rounded-2xl border p-3.5 text-center transition ${
+                role === "teacher"
+                  ? "border-indigo-600 bg-indigo-50/80 text-indigo-900 ring-2 ring-indigo-500/30"
+                  : "border-slate-200 bg-white/70 text-slate-600 hover:border-slate-300 hover:bg-white"
+              }`}
+            >
+              <span className="text-xl">👩‍🏫</span>
+              <span className="text-sm font-semibold">Teacher / Faculty</span>
+              <span className="text-[11px] text-slate-500">Manage Course & Classes</span>
+            </button>
+          </div>
+        </div>
+
         <div>
           <label
             htmlFor="register-fullname"
@@ -103,7 +161,7 @@ export default function RegisterPage() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="student@example.com"
+            placeholder="user@example.com"
             className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 shadow-sm transition focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
           />
         </div>
@@ -177,7 +235,7 @@ export default function RegisterPage() {
               <span>Creating account...</span>
             </>
           ) : (
-            <span>Sign Up</span>
+            <span>Sign Up as {role === "teacher" ? "Teacher" : "Student"}</span>
           )}
         </button>
       </form>

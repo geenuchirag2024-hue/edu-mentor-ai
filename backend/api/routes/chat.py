@@ -3,10 +3,12 @@ import json
 import queue
 import threading
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from backend.api.deps import get_current_user
 from backend.api.schemas.chat import ChatRequest, ChatResponse
+from backend.db.models import User
 from backend.services.assistant_pipeline import (
     finalize_text_query,
     process_text_query,
@@ -17,7 +19,13 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+):
+    # Derive learner_id securely from the authenticated token
+    authenticated_learner_id = f"user_{current_user.id}"
+
     result = await asyncio.to_thread(
         process_text_query,
         request.message,
@@ -25,7 +33,7 @@ async def chat(request: ChatRequest):
         False,
         request.tutor_mode,
         request.hint_level,
-        request.learner_id,
+        authenticated_learner_id,
         request.use_notes,
     )
     return ChatResponse(
@@ -39,7 +47,12 @@ async def chat(request: ChatRequest):
 
 
 @router.post("/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+):
+    authenticated_learner_id = f"user_{current_user.id}"
+
     async def event_generator():
         event_queue: queue.Queue[tuple[str, object]] = queue.Queue()
 
@@ -51,7 +64,7 @@ async def chat_stream(request: ChatRequest):
                     False,
                     request.tutor_mode,
                     request.hint_level,
-                    request.learner_id,
+                    authenticated_learner_id,
                     request.use_notes,
                 )
                 event_queue.put(("meta", {"session_id": sid, "sources": sources}))
@@ -61,7 +74,7 @@ async def chat_stream(request: ChatRequest):
                     event_queue.put(("token", token))
                 answer = "".join(answer_parts).strip()
                 finalize_text_query(
-                    sid, request.message, answer, learner_id=request.learner_id
+                    sid, request.message, answer, learner_id=authenticated_learner_id
                 )
                 from backend.services.mascot_cues import infer_mascot_cues
 

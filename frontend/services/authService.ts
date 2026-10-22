@@ -1,9 +1,12 @@
-import { API_URL, friendlyApiError } from "./api";
+import { API_URL, friendlyApiError, getStoredToken } from "./api";
+
+export type UserRole = "student" | "teacher";
 
 export interface AuthUser {
   id: number;
   full_name: string;
   email: string;
+  role: UserRole;
   created_at?: string;
 }
 
@@ -17,8 +20,7 @@ const TOKEN_KEY = "edu_mentor_token";
 const USER_KEY = "edu_mentor_user";
 
 export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+  return getStoredToken();
 }
 
 export function getCurrentUser(): AuthUser | null {
@@ -26,7 +28,11 @@ export function getCurrentUser(): AuthUser | null {
   const raw = window.localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as AuthUser;
+    const user = JSON.parse(raw) as AuthUser;
+    if (!user.role) {
+      user.role = "student";
+    }
+    return user;
   } catch {
     return null;
   }
@@ -50,11 +56,19 @@ export async function register(data: {
   full_name: string;
   email: string;
   password: string;
+  role?: string;
 }): Promise<AuthResponse> {
+  const payload = {
+    full_name: data.full_name.trim(),
+    email: data.email.trim(),
+    password: data.password,
+    role: data.role || "student",
+  };
+
   const res = await fetch(`${API_URL}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {

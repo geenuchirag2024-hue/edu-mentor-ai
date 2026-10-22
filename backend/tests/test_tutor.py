@@ -2,13 +2,9 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from backend.main import app
 from backend.services.learning import learning_store
-from backend.services.quiz import generate_quiz, grade_quiz
-
 from backend.services.mascot_cues import infer_mascot_cues
-
-client = TestClient(app)
+from backend.services.quiz import generate_quiz, grade_quiz
 
 
 def test_mascot_cues_greeting():
@@ -32,9 +28,13 @@ def test_quiz_generate_and_grade():
     assert "mascot_message" in result
 
 
-def test_progress_endpoint():
+def test_progress_endpoint(client: TestClient, auth_headers: dict):
     learning_store.get_or_create("dash-user")
-    response = client.get("/api/tutor/progress", params={"learner_id": "dash-user"})
+    response = client.get(
+        "/api/tutor/progress",
+        params={"learner_id": "dash-user"},
+        headers=auth_headers,
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["level"] >= 1
@@ -42,7 +42,7 @@ def test_progress_endpoint():
     assert "xp" in data
 
 
-def test_quiz_api_generate():
+def test_quiz_api_generate(client: TestClient, auth_headers: dict):
     with patch("backend.api.routes.tutor.generate_quiz") as mock_gen:
         mock_gen.return_value = {
             "quiz_id": "q-test",
@@ -66,6 +66,7 @@ def test_quiz_api_generate():
                 "n_questions": 4,
                 "learner_id": "api-user",
             },
+            headers=auth_headers,
         )
     assert response.status_code == 200
     body = response.json()
@@ -74,7 +75,7 @@ def test_quiz_api_generate():
     assert all("answer" not in q for q in body["questions"])
 
 
-def test_interview_start():
+def test_interview_start(client: TestClient, auth_headers: dict):
     with patch("backend.api.routes.tutor.start_interview") as mock_start:
         mock_start.return_value = {
             "interview_id": "iv-1",
@@ -94,6 +95,7 @@ def test_interview_start():
                 "n_questions": 3,
                 "learner_id": "iv-user",
             },
+            headers=auth_headers,
         )
     assert response.status_code == 200
     data = response.json()
@@ -121,12 +123,13 @@ def test_interview_start():
                 "interview_id": data["interview_id"],
                 "answer": "REST is a stateless style using HTTP verbs on resources.",
             },
+            headers=auth_headers,
         )
     assert second.status_code == 200
     assert "score" in second.json()
 
 
-def test_notes_upload_and_ask():
+def test_notes_upload_and_ask(client: TestClient, auth_headers: dict):
     with patch("backend.rag.embeddings.get_embeddings") as mock_emb:
         mock_emb.side_effect = RuntimeError("no embeddings in tests")
         files = {
@@ -136,7 +139,11 @@ def test_notes_upload_and_ask():
                 "text/plain",
             )
         }
-        upload = client.post("/api/tutor/notes/upload", files=files)
+        upload = client.post(
+            "/api/tutor/notes/upload",
+            files=files,
+            headers=auth_headers,
+        )
         assert upload.status_code == 200
         sid = upload.json()["session_id"]
 
@@ -147,6 +154,7 @@ def test_notes_upload_and_ask():
             ask = client.post(
                 "/api/tutor/notes/ask",
                 json={"session_id": sid, "question": "Explain ID3 from my notes."},
+                headers=auth_headers,
             )
         assert ask.status_code == 200
         assert "answer" in ask.json()

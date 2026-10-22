@@ -1,12 +1,13 @@
-"""Tutor APIs: quiz, interview, progress, and notes upload."""
+"""Tutor APIs: quiz, interview, progress, and notes upload with JWT protection."""
 
 from __future__ import annotations
 
 import asyncio
 import uuid
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
+from backend.api.deps import get_current_user
 from backend.api.schemas.tutor import (
     InterviewAnswerRequest,
     InterviewStartRequest,
@@ -16,6 +17,7 @@ from backend.api.schemas.tutor import (
     QuizGradeRequest,
     QuizHintRequest,
 )
+from backend.db.models import User
 from backend.models.llm import get_llm
 from backend.rag.user_docs import user_document_store
 from backend.services.interview import answer_interview, start_interview
@@ -27,30 +29,41 @@ router = APIRouter(prefix="/api/tutor", tags=["tutor"])
 
 
 @router.post("/quiz/generate", response_model=QuizGenerateResponse)
-async def quiz_generate(request: QuizGenerateRequest):
+async def quiz_generate(
+    request: QuizGenerateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    learner_id = request.learner_id or f"user_{current_user.id}"
     result = await asyncio.to_thread(
         generate_quiz,
         subject=request.subject,
         topic=request.topic,
         difficulty=request.difficulty,
         n_questions=request.n_questions,
-        learner_id=request.learner_id,
+        learner_id=learner_id,
     )
     return result
 
 
 @router.post("/quiz/grade")
-async def quiz_grade(request: QuizGradeRequest):
+async def quiz_grade(
+    request: QuizGradeRequest,
+    current_user: User = Depends(get_current_user),
+):
     try:
+        learner_id = request.learner_id or f"user_{current_user.id}"
         return await asyncio.to_thread(
-            grade_quiz, request.quiz_id, request.answers, request.learner_id
+            grade_quiz, request.quiz_id, request.answers, learner_id
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/quiz/hint")
-async def quiz_hint_route(request: QuizHintRequest):
+async def quiz_hint_route(
+    request: QuizHintRequest,
+    current_user: User = Depends(get_current_user),
+):
     try:
         return await asyncio.to_thread(quiz_hint, request.quiz_id, request.question_id)
     except KeyError as exc:
@@ -58,17 +71,24 @@ async def quiz_hint_route(request: QuizHintRequest):
 
 
 @router.post("/interview/start")
-async def interview_start(request: InterviewStartRequest):
+async def interview_start(
+    request: InterviewStartRequest,
+    current_user: User = Depends(get_current_user),
+):
+    learner_id = request.learner_id or f"user_{current_user.id}"
     return await asyncio.to_thread(
         start_interview,
         topic=request.topic,
-        learner_id=request.learner_id,
+        learner_id=learner_id,
         n_questions=request.n_questions,
     )
 
 
 @router.post("/interview/answer")
-async def interview_answer(request: InterviewAnswerRequest):
+async def interview_answer(
+    request: InterviewAnswerRequest,
+    current_user: User = Depends(get_current_user),
+):
     try:
         return await asyncio.to_thread(
             answer_interview, request.interview_id, request.answer
@@ -78,8 +98,12 @@ async def interview_answer(request: InterviewAnswerRequest):
 
 
 @router.get("/progress")
-async def progress(learner_id: str = Query(..., min_length=1)):
-    return learning_store.dashboard(learner_id)
+async def progress(
+    learner_id: str | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    effective_learner_id = learner_id or f"user_{current_user.id}"
+    return learning_store.dashboard(effective_learner_id)
 
 
 @router.post("/notes/upload")
@@ -87,8 +111,10 @@ async def notes_upload(
     file: UploadFile = File(...),
     session_id: str | None = Form(default=None),
     learner_id: str | None = Form(default=None),
+    current_user: User = Depends(get_current_user),
 ):
     sid = session_id or str(uuid.uuid4())
+    effective_learner_id = learner_id or f"user_{current_user.id}"
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
@@ -102,25 +128,31 @@ async def notes_upload(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if learner_id:
-        learning_store.record_study(learner_id, file.filename or "notes")
+    learning_store.record_study(effective_learner_id, file.filename or "notes")
     return meta
 
 
 @router.get("/notes")
-async def notes_list(session_id: str = Query(...)):
+async def notes_list(
+    session_id: str = Query(...),
+    current_user: User = Depends(get_current_user),
+):
     return {"session_id": session_id, "documents": user_document_store.list_docs(session_id)}
 
 
 @router.post("/notes/ask")
-async def notes_ask(request: NotesAskRequest):
+async def notes_ask(
+    request: NotesAskRequest,
+    current_user: User = Depends(get_current_user),
+):
     context, sources = user_document_store.retrieve(request.session_id, request.question)
     if not context:
         raise HTTPException(
             status_code=400,
             detail="No notes uploaded for this session. Upload a PDF or text file first.",
         )
-    coaching = learning_store.coaching_context(request.learner_id)
+    effective_learner_id = request.learner_id or f"user_{current_user.id}"
+    coaching = learning_store.coaching_context(effective_learner_id)
     extra = (
         "Answer using the student's uploaded notes. Quote or paraphrase the notes. "
         "If the notes do not cover the question, say so and give a short general explanation."
@@ -138,8 +170,7 @@ async def notes_ask(request: NotesAskRequest):
         return get_llm().generate(messages)
 
     answer = await asyncio.to_thread(_run)
-    if request.learner_id:
-        learning_store.record_study(request.learner_id, request.question, answer)
+    learning_store.record_study(effective_learner_id, request.question, answer)
     return {
         "answer": answer,
         "session_id": request.session_id,
