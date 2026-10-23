@@ -6,6 +6,9 @@ import MascotAvatar from "./MascotAvatar";
 import { SpeakingWaveform } from "./MascotStatusRing";
 import { STATE_LABELS } from "./mascotExpressions";
 
+import type { MentorId } from "@/types/mentor";
+import { getMentorProfile } from "@/services/mentors";
+
 interface MiraStageProps {
   state: MascotState;
   emotion?: MascotEmotion;
@@ -16,6 +19,7 @@ interface MiraStageProps {
   fill?: boolean;
   controls?: ReactNode;
   liveCaption?: string | null;
+  mentorId?: MentorId;
 }
 
 export default function MiraStage({
@@ -28,12 +32,14 @@ export default function MiraStage({
   fill = false,
   controls,
   liveCaption,
+  mentorId = "mira",
 }: MiraStageProps) {
   const speaking = state === "speaking";
   const portrait = size ?? (compact ? 140 : 300);
+  const profile = getMentorProfile(mentorId);
   const status =
     liveCaption ||
-    (state === "idle" ? "AI Learning Assistant" : STATE_LABELS[state]);
+    (state === "idle" ? profile.title : STATE_LABELS[state]);
 
   return (
     <div
@@ -79,6 +85,7 @@ export default function MiraStage({
           fill={fill}
           showLabel={false}
           className={fill ? "flex h-full min-h-0 w-full" : ""}
+          mentorId={mentorId}
         />
       </div>
 
@@ -96,7 +103,7 @@ export default function MiraStage({
             }`}
           />
           <div className="min-w-0 flex-1 leading-tight">
-            <p className="text-sm font-semibold">Mentor Mira</p>
+            <p className="text-sm font-semibold">{profile.name}</p>
             <p className="truncate text-[11px] text-white/75">{status}</p>
           </div>
         </div>

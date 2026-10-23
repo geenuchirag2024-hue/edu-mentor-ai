@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { apiFetch, apiRequest } from "@/services/api";
+import { apiFetch, apiRequest, friendlyApiError } from "@/services/api";
 import { AuthUser, getCurrentUser, getProfile } from "@/services/authService";
 
 interface TeacherStats {
@@ -97,7 +97,7 @@ export default function TeacherPage() {
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || "Failed to upload document");
+        throw new Error(friendlyApiError(res.status, text));
       }
 
       const resData = (await res.json()) as { message?: string; chunks_indexed?: number; subject?: string };
@@ -172,9 +172,19 @@ export default function TeacherPage() {
               Manage your machine learning curriculum, monitor enrolled students, and oversee student learning outcomes.
             </p>
           </div>
-          <div className="shrink-0 flex items-center gap-2">
+          <div className="shrink-0 flex flex-wrap items-center gap-2">
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              disabled={uploading}
+              className="rounded-2xl border-0 bg-white/20 px-3 py-2.5 text-xs font-semibold text-white backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-white/40 cursor-pointer"
+            >
+              <option value="Machine Learning" className="text-slate-900 bg-white">Machine Learning</option>
+              <option value="DBMS" className="text-slate-900 bg-white">DBMS</option>
+              <option value="Deep Learning" className="text-slate-900 bg-white">Deep Learning</option>
+            </select>
             <label className="cursor-pointer rounded-2xl bg-white px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-md transition hover:bg-indigo-50">
-              <span>{uploading ? "Uploading..." : "+ Upload Material (PDF/TXT)"}</span>
+              <span>{uploading ? "Indexing..." : `+ Upload Material`}</span>
               <input
                 type="file"
                 accept=".pdf,.txt"

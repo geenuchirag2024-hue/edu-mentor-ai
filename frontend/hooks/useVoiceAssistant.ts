@@ -8,6 +8,9 @@ import type { ChatMessage } from "@/types/chat";
 import type { TutorMode } from "@/types/tutor";
 import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
 
+import type { MentorId } from "@/types/mentor";
+import { DEFAULT_MENTOR_ID } from "@/services/mentors";
+
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -32,6 +35,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   const [tutorMode, setTutorMode] = useState<TutorMode>("teacher");
   const [hintLevel, setHintLevel] = useState(0);
   const [subject, setSubject] = useState<string>("Machine Learning");
+  const [mentorId, setMentorIdState] = useState<MentorId>(DEFAULT_MENTOR_ID);
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
@@ -41,6 +45,8 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   hintLevelRef.current = hintLevel;
   const subjectRef = useRef(subject);
   subjectRef.current = subject;
+  const mentorIdRef = useRef(mentorId);
+  mentorIdRef.current = mentorId;
   const abortRef = useRef<AbortController | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
@@ -97,6 +103,12 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     setMascot("idle");
     optionsRef.current.onSpeakingChange?.(false);
   }, [setMascot]);
+
+  const setMentorId = useCallback((newId: MentorId) => {
+    cancelTurn();
+    setMentorIdState(newId);
+    mentorIdRef.current = newId;
+  }, [cancelTurn]);
 
   const playAnswerAudio = useCallback(
     async (
@@ -166,6 +178,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
             hint_level: hintLevelRef.current,
             learner_id: getLearnerId(),
             subject: subjectRef.current,
+            mentor_id: mentorIdRef.current,
           },
           {
             onToken: (token) => {
@@ -292,6 +305,8 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
           {
             tutor_mode: tutorModeRef.current,
             learner_id: getLearnerId(),
+            subject: subjectRef.current,
+            mentor_id: mentorIdRef.current,
           },
           controller.signal
         );
@@ -359,6 +374,8 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     setHintLevel,
     subject,
     setSubject,
+    mentorId,
+    setMentorId,
     sendText,
     sendVoice,
     startListening,

@@ -15,7 +15,14 @@ from backend.services.assistant_pipeline import (
     stream_text_query,
 )
 
+from backend.services.mentor_registry import list_mentors
+
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+
+@router.get("/mentors")
+async def get_chat_mentors():
+    return list_mentors()
 
 
 @router.post("", response_model=ChatResponse)
@@ -36,6 +43,7 @@ async def chat(
         authenticated_learner_id,
         request.use_notes,
         request.subject,
+        request.mentor_id,
     )
     return ChatResponse(
         answer=result["answer"],
@@ -44,6 +52,7 @@ async def chat(
         emotion=result.get("emotion", "confident"),
         gesture=result.get("gesture", "point"),
         response_type=result.get("response_type", "explanation"),
+        mentor_id=result.get("mentor_id", request.mentor_id),
     )
 
 
@@ -68,9 +77,10 @@ async def chat_stream(
                     authenticated_learner_id,
                     request.use_notes,
                     request.subject,
+                    request.mentor_id,
                 )
 
-                event_queue.put(("meta", {"session_id": sid, "sources": sources}))
+                event_queue.put(("meta", {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id}))
                 answer_parts: list[str] = []
                 for token in token_iter:
                     answer_parts.append(token)
@@ -90,7 +100,7 @@ async def chat_stream(
                 event_queue.put(
                     (
                         "done",
-                        {"session_id": sid, "sources": sources, **cues},
+                        {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id, **cues},
                     )
                 )
             except Exception as exc:

@@ -9,6 +9,8 @@ import AudioPlayer from "@/components/voice/AudioPlayer";
 import type { AudioPlayerHandle } from "@/components/voice/AudioPlayer";
 import ModeSelector from "@/components/tutor/ModeSelector";
 import MicButton from "@/components/voice/MicButton";
+import MentorSelector from "@/components/mentor/MentorSelector";
+import { getMentorProfile } from "@/services/mentors";
 import { currentSpokenCaption } from "@/components/chat/speechReveal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -114,6 +116,8 @@ export default function ChatPage() {
     if (assistant.error) mascot.setEmotion("sad");
   }, [assistant.error, mascot.setEmotion]);
 
+  const currentMentor = getMentorProfile(assistant.mentorId);
+
   return (
     <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,28vh)_minmax(0,1fr)] gap-3 md:grid-cols-[minmax(0,1fr)_minmax(280px,34%)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
       <section className="glass-panel order-2 flex min-h-0 min-w-0 flex-col overflow-hidden md:order-1">
@@ -126,15 +130,20 @@ export default function ChatPage() {
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900">Chat with Mentor Mira</h2>
+                <h2 className="text-base font-bold text-slate-900">Chat with {currentMentor.name}</h2>
                 <span className="h-2 w-2 rounded-full bg-emerald-500" title="Online" />
               </div>
               <p className="text-[11px] font-medium text-slate-400">
-                Subject Knowledge: <span className="font-semibold text-violet-600">{assistant.subject}</span>
+                Mentor: <span className="font-semibold text-violet-600">{currentMentor.title}</span> • Subject: <span className="font-semibold text-violet-600">{assistant.subject}</span>
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <MentorSelector
+              selectedMentor={assistant.mentorId}
+              onSelectMentor={assistant.setMentorId}
+              disabled={assistant.isProcessing}
+            />
             <div className="flex items-center rounded-xl bg-slate-100/90 p-0.5 text-xs">
               {(["Machine Learning", "DBMS", "Deep Learning"] as const).map((s) => (
                 <button
@@ -196,6 +205,7 @@ export default function ChatPage() {
           fill
           compact={compact}
           liveCaption={liveCaption}
+          mentorId={assistant.mentorId}
           controls={
             <div className="flex items-center gap-2 rounded-full bg-slate-900/85 px-2 py-1.5 shadow-xl backdrop-blur-md">
               <MicButton

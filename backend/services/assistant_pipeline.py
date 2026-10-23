@@ -26,6 +26,7 @@ def prepare_text_query(
     learner_id: str | None = None,
     use_notes: bool = False,
     subject: str = "Machine Learning",
+    mentor_id: str | None = "mira",
 ) -> tuple[str, list[dict[str, str]], list[str]]:
     """Build session id, LLM messages, and sources without updating history."""
     sid = conversation_store.get_or_create_session(session_id)
@@ -49,6 +50,7 @@ def prepare_text_query(
         hint_level=hint_level,
         extra_system=extra,
         subject=subject,
+        mentor_id=mentor_id,
     )
     return sid, messages, sources
 
@@ -74,6 +76,7 @@ def stream_text_query(
     learner_id: str | None = None,
     use_notes: bool = False,
     subject: str = "Machine Learning",
+    mentor_id: str | None = "mira",
 ) -> tuple[str, Iterator[str], list[str]]:
     """Return session id, token stream, and sources for SSE chat."""
     sid, messages, sources = prepare_text_query(
@@ -85,6 +88,7 @@ def stream_text_query(
         learner_id=learner_id,
         use_notes=use_notes,
         subject=subject,
+        mentor_id=mentor_id,
     )
     tokens = get_llm().generate_stream(messages, for_voice=for_voice)
     return sid, tokens, sources
@@ -99,6 +103,7 @@ def process_text_query(
     learner_id: str | None = None,
     use_notes: bool = False,
     subject: str = "Machine Learning",
+    mentor_id: str | None = "mira",
 ) -> dict:
     sid, messages, sources = prepare_text_query(
         message,
@@ -109,6 +114,7 @@ def process_text_query(
         learner_id=learner_id,
         use_notes=use_notes,
         subject=subject,
+        mentor_id=mentor_id,
     )
     answer = get_llm().generate(messages, for_voice=for_voice)
     finalize_text_query(sid, message, answer, learner_id=learner_id)
@@ -122,6 +128,7 @@ def process_text_query(
         "answer": answer,
         "session_id": sid,
         "sources": sources,
+        "mentor_id": mentor_id or "mira",
         **cues,
     }
 
@@ -135,6 +142,7 @@ def process_voice_query(
     use_notes: bool = False,
     hint_level: int = 0,
     subject: str = "Machine Learning",
+    mentor_id: str | None = "mira",
 ) -> dict:
     transcript = get_stt().transcribe(audio_bytes, filename=filename)
 
@@ -151,6 +159,7 @@ def process_voice_query(
             "emotion": "surprised",
             "gesture": "wave",
             "response_type": "greeting",
+            "mentor_id": mentor_id or "mira",
         }
 
     result = process_text_query(
@@ -162,6 +171,7 @@ def process_voice_query(
         learner_id=learner_id,
         use_notes=use_notes,
         subject=subject,
+        mentor_id=mentor_id,
     )
     audio = get_tts().synthesize(result["answer"])
 
@@ -174,5 +184,6 @@ def process_voice_query(
         "emotion": result.get("emotion", "confident"),
         "gesture": result.get("gesture", "none"),
         "response_type": result.get("response_type", "explanation"),
+        "mentor_id": mentor_id or "mira",
     }
 

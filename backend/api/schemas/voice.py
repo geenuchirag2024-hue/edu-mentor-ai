@@ -23,3 +23,4 @@ class VoiceQueryResponse(BaseModel):
     emotion: str = "confident"
     gesture: str = "point"
     response_type: str = "explanation"
+    mentor_id: str = "mira"

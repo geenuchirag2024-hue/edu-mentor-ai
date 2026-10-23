@@ -43,10 +43,12 @@ def build_tutor_messages(
     hint_level: int = 0,
     extra_system: str | None = None,
     subject: str = "Machine Learning",
+    mentor_id: str | None = None,
 ) -> list[dict[str, str]]:
+    from backend.services.mentor_registry import get_mentor_prompt
     from backend.services.tutor_modes import hint_addendum, mode_addendum
 
-    system = ML_TUTOR_SYSTEM_PROMPT
+    system = get_mentor_prompt(mentor_id)
     system += mode_addendum(tutor_mode)
     system += hint_addendum(hint_level)
     if extra_system:

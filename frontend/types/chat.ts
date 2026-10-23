@@ -17,6 +17,7 @@ export interface ChatRequest {
   learner_id?: string;
   use_notes?: boolean;
   subject?: string;
+  mentor_id?: string;
 }
 
 
@@ -27,4 +28,5 @@ export interface ChatResponse {
   emotion?: string;
   gesture?: string;
   response_type?: string;
+  mentor_id?: string;
 }

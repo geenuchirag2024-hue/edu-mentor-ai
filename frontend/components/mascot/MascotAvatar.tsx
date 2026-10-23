@@ -15,6 +15,10 @@ import {
 import { useLipSync } from "./useLipSync";
 import { useMascotAnimation } from "./useMascotAnimation";
 
+import type { MentorId } from "@/types/mentor";
+import { getMentorProfile } from "@/services/mentors";
+import HumanMentorFace from "./HumanMentorFace";
+
 interface MascotAvatarProps {
   state: MascotState;
   emotion?: MascotEmotion;
@@ -27,6 +31,7 @@ interface MascotAvatarProps {
   fill?: boolean;
   showLabel?: boolean;
   className?: string;
+  mentorId?: MentorId;
 }
 
 function resolveExpression(
@@ -54,6 +59,7 @@ export default function MascotAvatar({
   fill = false,
   showLabel = true,
   className = "",
+  mentorId = "mira",
 }: MascotAvatarProps) {
   const faceRef = useRef<MentorFaceHandle>(null);
   const lipSync = useLipSync();
@@ -110,12 +116,16 @@ export default function MascotAvatar({
           ? "bg-indigo-500"
           : "bg-slate-300";
 
+  const profile = getMentorProfile(mentorId);
+  const isMira = mentorId === "mira" || !mentorId;
+
   return (
     <div
       className={`relative flex flex-col items-center select-none ${className}`}
       data-mascot-state={state}
       data-mascot-emotion={emotion}
       data-mascot-gesture={gesture}
+      data-mentor-id={mentorId}
     >
       {showLabel && (
         <div className={`text-center ${compact ? "mb-1" : "mb-2"}`}>
@@ -124,7 +134,7 @@ export default function MascotAvatar({
               compact ? "text-sm" : "text-[15px]"
             }`}
           >
-            Mentor Mira
+            {profile.name}
           </p>
           <p
             className={`mt-0.5 flex items-center justify-center gap-1.5 ${compact ? "text-[11px]" : "text-xs"} ${statusTone}`}
@@ -150,12 +160,22 @@ export default function MascotAvatar({
         }
       >
         <MascotStatusRing state={state} audioLevelRef={audioLevelRef} />
-        <MentorFace
-          ref={faceRef}
-          size={fill ? undefined : width}
-          expression={resolveExpression(state, emotion)}
-          className="relative z-10"
-        />
+        {isMira ? (
+          <MentorFace
+            ref={faceRef}
+            size={fill ? undefined : width}
+            expression={resolveExpression(state, emotion)}
+            className="relative z-10"
+          />
+        ) : (
+          <HumanMentorFace
+            ref={faceRef}
+            mentorId={mentorId}
+            size={fill ? undefined : width}
+            expression={resolveExpression(state, emotion)}
+            className="relative z-10"
+          />
+        )}
       </div>
     </div>
   );

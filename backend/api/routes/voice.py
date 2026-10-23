@@ -68,16 +68,20 @@ async def voice_query(
     learner_id: str | None = Form(default=None),
     use_notes: bool = Form(default=False),
     hint_level: int = Form(default=0),
+    subject: str = Form(default="Machine Learning"),
+    mentor_id: str = Form(default="mira"),
     current_user: User = Depends(get_current_user),
 ):
     try:
         authenticated_learner_id = f"user_{current_user.id}"
         audio_bytes = await audio.read()
         logger.info(
-            "voice_query endpoint: received %d bytes, filename=%s, user=%s",
+            "voice_query endpoint: received %d bytes, filename=%s, user=%s, mentor=%s, subject=%s",
             len(audio_bytes),
             audio.filename,
             current_user.email,
+            mentor_id,
+            subject,
         )
         result = await asyncio.to_thread(
             process_voice_query,
@@ -88,6 +92,8 @@ async def voice_query(
             authenticated_learner_id,
             use_notes,
             hint_level,
+            subject,
+            mentor_id,
         )
         return VoiceQueryResponse(**result)
     except Exception as exc:

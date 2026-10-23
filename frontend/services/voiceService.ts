@@ -4,7 +4,7 @@ import type { VoiceQueryResponse } from "@/types/voice";
 export async function sendVoiceQuery(
   audioBlob: Blob,
   sessionId?: string,
-  extra?: { tutor_mode?: string; learner_id?: string; use_notes?: boolean },
+  extra?: { tutor_mode?: string; learner_id?: string; use_notes?: boolean; mentor_id?: string; subject?: string },
   signal?: AbortSignal
 ): Promise<VoiceQueryResponse> {
   const form = new FormData();
@@ -13,6 +13,8 @@ export async function sendVoiceQuery(
   if (extra?.tutor_mode) form.append("tutor_mode", extra.tutor_mode);
   if (extra?.learner_id) form.append("learner_id", extra.learner_id);
   if (extra?.use_notes) form.append("use_notes", "true");
+  if (extra?.mentor_id) form.append("mentor_id", extra.mentor_id);
+  if (extra?.subject) form.append("subject", extra.subject);
 
   const res = await apiRequest("/api/assistant/voice-query", {
     method: "POST",
