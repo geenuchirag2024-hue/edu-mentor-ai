@@ -59,16 +59,20 @@ def build_tutor_messages(
     lang_code = (language or "en").lower().strip()
     if lang_code.startswith("hi"):
         system += (
-            "\n\nLANGUAGE INSTRUCTION: The student is communicating in Hindi (हिन्दी). "
-            "Formulate your entire response in clear, fluent, natural Hindi (using Devanagari script) "
-            "while preserving technical terms and your mentor personality."
+            "\n\nLANGUAGE INSTRUCTION: उत्तर स्वाभाविक हिंदी भाषा में, देवनागरी लिपि में दें। "
+            "The student is communicating in Hindi (हिन्दी). Formulate your entire response in clear, "
+            "fluent, natural Hindi (using Devanagari script). Do not merely transliterate English; "
+            "provide genuine, grammatically coherent educational explanations while preserving technical clarity."
         )
     elif lang_code.startswith("kn"):
         system += (
-            "\n\nLANGUAGE INSTRUCTION: The student is communicating in Kannada (ಕನ್ನಡ). "
-            "Formulate your response in clear, friendly Kannada (using Kannada script) "
-            "while preserving core technical clarity and your mentor personality."
+            "\n\nLANGUAGE INSTRUCTION: ಉತ್ತರವನ್ನು ಸಹಜ ಕನ್ನಡ ಭಾಷೆಯಲ್ಲಿ, ಕನ್ನಡ ಲಿಪಿಯಲ್ಲಿ ನೀಡಿ. "
+            "The student is communicating in Kannada (ಕನ್ನಡ). Formulate your entire response in clear, "
+            "friendly, natural Kannada (using Kannada script). Do not merely transliterate English into Kannada script; "
+            "provide genuine, educational explanations with natural grammar while preserving technical clarity."
         )
+    else:
+        system += "\n\nLANGUAGE INSTRUCTION: Answer naturally in English."
 
     if for_voice:
         system += VOICE_TUTOR_ADDENDUM

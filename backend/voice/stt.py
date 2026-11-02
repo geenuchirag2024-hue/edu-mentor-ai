@@ -1,4 +1,4 @@
-"""Speech-to-text using faster-whisper with multilingual language support."""
+"""Speech-to-text using faster-whisper with multilingual language support (EN, HI, KN)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import os
 import tempfile
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from backend.config import get_settings
 from backend.utils.audio_preprocess import looks_like_hallucination, preprocess_wav
@@ -29,7 +30,7 @@ class STTService:
             device="cpu",
             compute_type="int8",
         )
-        logger.info("Loaded Whisper model: %s", self.settings.whisper_model)
+        logger.info("Loaded Faster-Whisper multilingual model: %s", self.settings.whisper_model)
 
     def transcribe(
         self,
@@ -37,8 +38,26 @@ class STTService:
         filename: str = "audio.wav",
         language: str | None = None,
     ) -> str:
-        if not audio_bytes:
-            return ""
+        """Backward-compatible transcription returning plain recognized text."""
+        info = self.transcribe_with_info(audio_bytes, filename=filename, language=language)
+        return info.get("text", "")
+
+    def transcribe_with_info(
+        self,
+        audio_bytes: bytes,
+        filename: str = "audio.wav",
+        language: str | None = None,
+    ) -> dict[str, Any]:
+        """Perform multilingual transcription, returning text, detected language, and status."""
+        if not audio_bytes or len(audio_bytes) < 64:
+            return {
+                "text": "",
+                "language": language or "en",
+                "detected_language": None,
+                "language_probability": 0.0,
+                "status": "empty_audio",
+                "message": "Recording was empty or too short. Please speak clearly.",
+            }
 
         self._load()
         audio_bytes = preprocess_wav(audio_bytes)
@@ -47,53 +66,78 @@ class STTService:
         os.close(fd)
         Path(tmp_path).write_bytes(audio_bytes)
 
-        logger.info("STT input: %d bytes, model=%s, lang=%s", len(audio_bytes), self.settings.whisper_model, language)
+        logger.info(
+            "STT input: %d bytes, model=%s, requested_lang=%s",
+            len(audio_bytes),
+            self.settings.whisper_model,
+            language,
+        )
 
         try:
-            text = self._transcribe_file(tmp_path, vad_filter=False, language=language)
+            lang = language.lower().strip() if language else None
+            if lang in ("auto", "", "none"):
+                lang = None
+            elif lang.startswith("hi"):
+                lang = "hi"
+            elif lang.startswith("kn"):
+                lang = "kn"
+            elif lang.startswith("en"):
+                lang = "en"
+
+            segments, info = self._model.transcribe(
+                tmp_path,
+                beam_size=1,
+                language=lang,
+                vad_filter=False,
+                condition_on_previous_text=False,
+                without_timestamps=True,
+            )
+            text = " ".join(segment.text.strip() for segment in segments).strip()
+            detected_lang = getattr(info, "language", None)
+            prob = getattr(info, "language_probability", 0.0)
+
             if looks_like_hallucination(text):
                 logger.info("STT hallucination filtered: '%s'", text)
-                return ""
-            logger.info("STT result: '%s'", text)
-            return text
+                return {
+                    "text": "",
+                    "language": lang or detected_lang or "en",
+                    "detected_language": detected_lang,
+                    "language_probability": prob,
+                    "status": "filtered_hallucination",
+                    "message": "Speech was unclear or background noise was detected.",
+                }
+
+            if not text:
+                return {
+                    "text": "",
+                    "language": lang or detected_lang or "en",
+                    "detected_language": detected_lang,
+                    "language_probability": prob,
+                    "status": "no_speech_detected",
+                    "message": "No speech detected in audio recording.",
+                }
+
+            logger.info("STT recognized (%s -> %s): '%s'", lang, detected_lang, text)
+            return {
+                "text": text,
+                "language": lang or detected_lang or "en",
+                "detected_language": detected_lang,
+                "language_probability": prob,
+                "status": "success",
+                "message": "Transcription successful.",
+            }
         except Exception as exc:
             logger.error("STT failed: %s", exc)
-            return ""
+            return {
+                "text": "",
+                "language": language or "en",
+                "detected_language": None,
+                "language_probability": 0.0,
+                "status": "error",
+                "message": f"Transcription error: {exc}",
+            }
         finally:
             Path(tmp_path).unlink(missing_ok=True)
-
-    def _transcribe_file(
-        self,
-        path: str,
-        vad_filter: bool,
-        language: str | None = None,
-    ) -> str:
-        lang = language.lower().strip() if language else None
-        if lang in ("auto", "", "none"):
-            lang = None
-        elif lang.startswith("hi"):
-            lang = "hi"
-        elif lang.startswith("kn"):
-            lang = "kn"
-        elif lang.startswith("en"):
-            lang = "en"
-
-        segments, info = self._model.transcribe(
-            path,
-            beam_size=1,
-            language=lang,
-            vad_filter=vad_filter,
-            condition_on_previous_text=False,
-            without_timestamps=True,
-        )
-        text = " ".join(segment.text.strip() for segment in segments).strip()
-        logger.info(
-            "STT requested_lang=%s detected_lang=%s vad=%s",
-            lang,
-            getattr(info, "language", "?"),
-            vad_filter,
-        )
-        return text
 
 
 @lru_cache

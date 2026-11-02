@@ -25,11 +25,13 @@ class Settings(BaseSettings):
     )
 
     llm_model_path: str = str(PROJECT_ROOT / "data/models/qwen3.gguf")
+    llm_fallback_model_path: str = str(PROJECT_ROOT / "data/models/qwen3.gguf")
     llm_context_length: int = 1536
-    llm_max_tokens: int = 192
+    llm_max_tokens: int = 256
     llm_max_tokens_voice: int = 128
     llm_n_threads: int = 4
     llm_n_batch: int = 512
+    llm_n_gpu_layers: int = 0  # set >0 or -1 if compiled with CUDA offloading
 
     embedding_model: str = "BAAI/bge-base-en-v1.5"
 
@@ -47,6 +49,16 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "change-me-in-production"
     jwt_expiry_hours: int = 24
+
+    # Password Reset & Email Configuration
+    password_reset_token_expire_minutes: int = 20
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "noreply@edumentor.ai"
+    smtp_use_tls: bool = True
+    frontend_url: str = "http://localhost:3000"
 
     rag_chunk_size: int = 600
     rag_chunk_overlap: int = 80

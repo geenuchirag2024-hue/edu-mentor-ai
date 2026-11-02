@@ -1,4 +1,4 @@
-"""LLM wrapper using llama-cpp-python with optional mock fallback."""
+"""LLM wrapper using llama-cpp-python with GPU offloading and fallback support."""
 
 from __future__ import annotations
 
@@ -20,31 +20,63 @@ class LLMService:
         self._mock_mode = False
         self._gen_lock = threading.Lock()
 
+    def _resolve_model_path(self) -> Path | None:
+        primary = Path(self.settings.llm_model_path)
+        if primary.exists() and primary.stat().st_size > 1_000_000:
+            return primary
+
+        fallback = Path(self.settings.llm_fallback_model_path)
+        if fallback.exists() and fallback.stat().st_size > 1_000_000:
+            logger.info("Primary LLM (%s) not found; using fallback model (%s)", primary, fallback)
+            return fallback
+
+        return None
+
     def _load(self) -> None:
         if self._model is not None or self._mock_mode:
             return
 
-        model_path = Path(self.settings.llm_model_path)
-        if not model_path.exists():
+        model_path = self._resolve_model_path()
+        if not model_path:
             logger.warning(
-                "LLM model not found at %s — using mock responses. "
+                "No LLM model found at %s or %s — using mock responses. "
                 "Run scripts/download_models.py to download Qwen GGUF.",
-                model_path,
+                self.settings.llm_model_path,
+                self.settings.llm_fallback_model_path,
             )
             self._mock_mode = True
             return
 
         try:
-            from llama_cpp import Llama
+            from llama_cpp import Llama, llama_supports_gpu_offload
+
+            supports_gpu = llama_supports_gpu_offload()
+            requested_gpu_layers = self.settings.llm_n_gpu_layers
+
+            if supports_gpu and requested_gpu_layers != 0:
+                n_gpu_layers = requested_gpu_layers
+                logger.info(
+                    "CUDA GPU offloading supported: offloading %d layers to GPU",
+                    n_gpu_layers,
+                )
+            else:
+                n_gpu_layers = 0
+                logger.info(
+                    "Using CPU inference (threads=%d, batch=%d, context=%d)",
+                    self.settings.llm_n_threads,
+                    self.settings.llm_n_batch,
+                    self.settings.llm_context_length,
+                )
 
             self._model = Llama(
                 model_path=str(model_path),
                 n_ctx=self.settings.llm_context_length,
                 n_threads=self.settings.llm_n_threads,
                 n_batch=self.settings.llm_n_batch,
+                n_gpu_layers=n_gpu_layers,
                 verbose=False,
             )
-            logger.info("Loaded LLM from %s", model_path)
+            logger.info("Loaded LLM from %s (n_gpu_layers=%d)", model_path, n_gpu_layers)
         except Exception as exc:
             logger.warning("Failed to load LLM: %s — using mock mode", exc)
             self._mock_mode = True

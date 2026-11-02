@@ -4,6 +4,10 @@ from pydantic import BaseModel
 class TranscribeResponse(BaseModel):
     text: str
     language: str | None = None
+    detected_language: str | None = None
+    language_probability: float | None = None
+    status: str = "success"
+    message: str | None = None
 
 
 class SynthesizeRequest(BaseModel):
@@ -17,6 +21,8 @@ class SynthesizeResponse(BaseModel):
     content_type: str = "audio/wav"
     mentor_id: str = "mira"
     language: str = "en"
+    tts_supported: bool = True
+    status: str = "success"
 
 
 class VoiceQueryResponse(BaseModel):
@@ -30,3 +36,4 @@ class VoiceQueryResponse(BaseModel):
     response_type: str = "explanation"
     mentor_id: str = "mira"
     language: str = "en"
+    tts_supported: bool = True

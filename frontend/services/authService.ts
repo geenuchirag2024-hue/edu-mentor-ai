@@ -124,3 +124,51 @@ export async function getProfile(): Promise<AuthUser | null> {
     return getCurrentUser();
   }
 }
+
+export async function forgotPassword(email: string): Promise<{ message: string; reset_link_dev?: string }> {
+  const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim() }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(friendlyApiError(res.status, text));
+  }
+
+  return res.json() as Promise<{ message: string; reset_link_dev?: string }>;
+}
+
+export async function validateResetToken(token: string): Promise<{ valid: boolean; message: string }> {
+  const res = await fetch(`${API_URL}/api/auth/validate-reset-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: token.trim() }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(friendlyApiError(res.status, text));
+  }
+
+  return res.json() as Promise<{ valid: boolean; message: string }>;
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string
+): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: token.trim(), new_password: newPassword }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(friendlyApiError(res.status, text));
+  }
+
+  return res.json() as Promise<{ success: boolean; message: string }>;
+}

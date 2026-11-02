@@ -164,10 +164,11 @@ def process_voice_query(
 
         audio = get_tts().synthesize(fallback, mentor_id=mentor_id, language=language)
         sid = conversation_store.get_or_create_session(session_id)
+        tts_supported = bool(audio and len(audio) > 44)
         return {
             "transcript": "",
             "answer": fallback,
-            "audio_base64": audio_to_base64(audio),
+            "audio_base64": audio_to_base64(audio) if audio else "",
             "session_id": sid,
             "sources": [],
             "emotion": "surprised",
@@ -175,6 +176,7 @@ def process_voice_query(
             "response_type": "greeting",
             "mentor_id": mentor_id or "mira",
             "language": language or "en",
+            "tts_supported": tts_supported,
         }
 
     result = process_text_query(
@@ -190,11 +192,12 @@ def process_voice_query(
         language=language,
     )
     audio = get_tts().synthesize(result["answer"], mentor_id=mentor_id, language=language)
+    tts_supported = bool(audio and len(audio) > 44)
 
     return {
         "transcript": transcript,
         "answer": result["answer"],
-        "audio_base64": audio_to_base64(audio),
+        "audio_base64": audio_to_base64(audio) if audio else "",
         "session_id": result["session_id"],
         "sources": result["sources"],
         "emotion": result.get("emotion", "confident"),
@@ -202,4 +205,5 @@ def process_voice_query(
         "response_type": result.get("response_type", "explanation"),
         "mentor_id": mentor_id or "mira",
         "language": language or "en",
+        "tts_supported": tts_supported,
     }

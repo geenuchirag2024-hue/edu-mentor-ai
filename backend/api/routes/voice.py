@@ -12,6 +12,7 @@ from backend.api.schemas.voice import (
 )
 from backend.db.models import User
 from backend.services.assistant_pipeline import process_voice_query
+from backend.services.mentor_registry import get_mentor_voice_config
 from backend.utils.audio import audio_to_base64
 from backend.voice.stt import get_stt
 from backend.voice.tts import get_tts
@@ -36,13 +37,20 @@ async def transcribe(
             language,
             current_user.email,
         )
-        text = await asyncio.to_thread(
-            get_stt().transcribe,
+        info = await asyncio.to_thread(
+            get_stt().transcribe_with_info,
             audio_bytes,
             audio.filename or "audio.webm",
             language=language,
         )
-        return TranscribeResponse(text=text, language=language)
+        return TranscribeResponse(
+            text=info.get("text", ""),
+            language=info.get("language") or language,
+            detected_language=info.get("detected_language"),
+            language_probability=info.get("language_probability"),
+            status=info.get("status", "success"),
+            message=info.get("message"),
+        )
     except Exception as exc:
         logger.exception("transcribe failed: %s", exc)
         raise HTTPException(
@@ -56,6 +64,10 @@ async def synthesize(
     current_user: User = Depends(get_current_user),
 ):
     try:
+        clean_lang = (request.language or "en").lower().strip()
+        voice_cfg = get_mentor_voice_config(request.mentor_id, language=clean_lang)
+        tts_supported = bool(voice_cfg.get("is_supported", True))
+
         audio = await asyncio.to_thread(
             get_tts().synthesize,
             request.text,
@@ -63,9 +75,11 @@ async def synthesize(
             request.language,
         )
         return SynthesizeResponse(
-            audio_base64=audio_to_base64(audio),
+            audio_base64=audio_to_base64(audio) if audio else "",
             mentor_id=request.mentor_id or "mira",
             language=request.language or "en",
+            tts_supported=tts_supported,
+            status="success" if audio else ("tts_unsupported" if not tts_supported else "silent_fallback"),
         )
     except Exception as exc:
         logger.exception("synthesize failed: %s", exc)

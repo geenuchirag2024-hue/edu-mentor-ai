@@ -1,4 +1,4 @@
-"""Text-to-speech using Piper with multi-mentor voice assignment and fallbacks."""
+"""Text-to-speech using Piper with multi-mentor voice assignment, caching, and fallbacks."""
 
 from __future__ import annotations
 
@@ -31,6 +31,9 @@ class TTSService:
         self._workers: dict[str, subprocess.Popen[bytes]] = {}
         self._lock = threading.Lock()
         self._reported_fallbacks: set[str] = set()
+        self._audio_cache: dict[tuple[str, str, str, str, str], bytes] = {}
+        self._cache_lock = threading.Lock()
+        self._max_cache_items = 250
 
     def resolve_mentor_voice(
         self,
@@ -218,22 +221,43 @@ class TTSService:
         mentor_id: str | None = None,
         language: str | None = "en",
     ) -> bytes:
-        """Synthesize speech audio for the specified mentor and language."""
+        """Synthesize speech audio with distinct mentor voices, multilingual resolution, and caching."""
         speech_text = prepare_text_for_speech(text)
         if not speech_text.strip():
             return self._silent_wav()
 
-        onnx_path, voice_cfg, _ = self.resolve_mentor_voice(mentor_id, language=language)
+        clean_id = normalize_mentor_id(mentor_id)
+        clean_lang = (language or "en").lower().strip()
+        if clean_lang.startswith("hi"):
+            clean_lang = "hi"
+        elif clean_lang.startswith("kn"):
+            clean_lang = "kn"
+        else:
+            clean_lang = "en"
+
+        onnx_path, voice_cfg, _ = self.resolve_mentor_voice(clean_id, language=clean_lang)
+
+        # Explicitly enforce rule: Never read non-English (e.g. Kannada) text with an English voice
+        if not voice_cfg.get("is_supported", True):
+            logger.info(
+                "[TTS] Language '%s' is not supported by installed Piper TTS models. "
+                "Skipping audio generation to avoid playing incompatible English voice on non-English text. "
+                "Exact text response is preserved.",
+                clean_lang,
+            )
+            return b""
+
         if not onnx_path.exists():
             return self._silent_wav(duration_ms=max(500, len(speech_text) * 30))
 
-        if not voice_cfg.get("is_supported", True):
-            logger.info(
-                "[TTS] Language '%s' is not natively supported by Piper (%s). Using fallback voice %s.",
-                language,
-                voice_cfg.get("unsupported_reason", ""),
-                onnx_path.name,
-            )
+        engine = voice_cfg.get("tts_engine", "piper")
+        target_model = voice_cfg.get("voice_model", "en_US-lessac-medium")
+        cache_key = (speech_text, clean_id, clean_lang, engine, target_model)
+
+        with self._cache_lock:
+            cached = self._audio_cache.get(cache_key)
+            if cached:
+                return cached
 
         payload_obj = {
             "text": speech_text,
@@ -252,6 +276,13 @@ class TTSService:
 
         if not wav or len(wav) < 44:
             return self._silent_wav(duration_ms=max(500, min(len(speech_text) * 30, 8000)))
+
+        with self._cache_lock:
+            if len(self._audio_cache) >= self._max_cache_items:
+                oldest = next(iter(self._audio_cache))
+                del self._audio_cache[oldest]
+            self._audio_cache[cache_key] = wav
+
         return wav
 
     @staticmethod

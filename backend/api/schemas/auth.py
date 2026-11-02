@@ -1,5 +1,5 @@
-from typing import Literal
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
@@ -63,3 +63,30 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserOut | None = None
 
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    reset_link_dev: str | None = None  # Exposed in dev when SMTP is unconfigured for local testing
+
+
+class ValidateResetTokenRequest(BaseModel):
+    token: str
+
+
+class ValidateResetTokenResponse(BaseModel):
+    valid: bool
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=10)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class ResetPasswordResponse(BaseModel):
+    success: bool
+    message: str
