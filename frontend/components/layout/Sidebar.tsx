@@ -25,105 +25,206 @@ export default function Sidebar() {
     return () => window.removeEventListener("edu_mentor_auth_changed", handleAuth);
   }, []);
 
+  // Close panel on Escape key
+  useEffect(() => {
+    if (!panel) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanel(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [panel]);
+
   const isTeacher = user?.role === "teacher";
   const links = isTeacher
     ? [{ href: "/teacher", label: "Teacher", icon: TeacherIcon }, ...BASE_LINKS]
     : BASE_LINKS;
 
   return (
-    <aside className="glass-bar relative flex h-full w-[4.75rem] shrink-0 flex-col py-3 xl:w-52">
-      <nav className="flex flex-1 flex-col gap-1 px-2" aria-label="Main">
-        {links.map((link) => {
-          const active =
-            pathname === link.href || pathname.startsWith(`${link.href}/`);
-          const Icon = link.icon;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              title={link.label}
-              className={`flex items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition xl:justify-start ${
-                active
-                  ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-600/25"
-                  : "text-slate-500 hover:bg-white/80 hover:text-slate-800"
-              }`}
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              <span className="hidden xl:inline">{link.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+    <>
+      <aside className="glass-bar relative z-20 flex h-full w-[4.75rem] shrink-0 flex-col py-3 xl:w-52">
+        <nav className="flex flex-1 flex-col gap-1 px-2" aria-label="Main">
+          {links.map((link) => {
+            const active =
+              pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                title={link.label}
+                className={`flex items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition xl:justify-start ${
+                  active
+                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-600/25"
+                    : "text-slate-500 hover:bg-white/80 hover:text-slate-800"
+                }`}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="hidden xl:inline">{link.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
-      <div className="mx-2 border-t border-slate-200/80 pt-2">
-        <button
-          type="button"
-          onClick={() => setPanel(panel === "settings" ? null : "settings")}
-          className={`flex w-full items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition xl:justify-start ${
-            panel === "settings"
-              ? "bg-white text-slate-800"
-              : "text-slate-500 hover:bg-white hover:text-slate-800"
-          }`}
-        >
-          <SettingsIcon className="h-5 w-5 shrink-0" />
-          <span className="hidden xl:inline">Settings</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPanel(panel === "help" ? null : "help")}
-          className={`flex w-full items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition xl:justify-start ${
-            panel === "help"
-              ? "bg-white text-slate-800"
-              : "text-slate-500 hover:bg-white hover:text-slate-800"
-          }`}
-        >
-          <HelpIcon className="h-5 w-5 shrink-0" />
-          <span className="hidden xl:inline">Help</span>
-        </button>
-      </div>
-
-      <div className="mx-2 mt-3 hidden rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 p-3.5 text-white shadow-lg shadow-violet-500/25 xl:block">
-        <p className="text-sm font-semibold leading-snug">
-          {isTeacher ? "Empower your students! 📚" : "Keep Learning, Keep Growing! 🚀"}
-        </p>
-        <div className="mt-3 flex gap-1.5">
-          <span className="h-1.5 w-4 rounded-full bg-white" />
-          <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
-          <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+        <div className="mx-2 border-t border-slate-200/80 pt-2">
+          <button
+            type="button"
+            onClick={() => setPanel(panel === "settings" ? null : "settings")}
+            className={`flex w-full items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition xl:justify-start ${
+              panel === "settings"
+                ? "bg-white text-slate-800"
+                : "text-slate-500 hover:bg-white hover:text-slate-800"
+            }`}
+          >
+            <SettingsIcon className="h-5 w-5 shrink-0" />
+            <span className="hidden xl:inline">Settings</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPanel(panel === "help" ? null : "help")}
+            className={`flex w-full items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition xl:justify-start ${
+              panel === "help"
+                ? "bg-white text-slate-800"
+                : "text-slate-500 hover:bg-white hover:text-slate-800"
+            }`}
+          >
+            <HelpIcon className="h-5 w-5 shrink-0" />
+            <span className="hidden xl:inline">Help</span>
+          </button>
         </div>
-      </div>
 
-      {panel && (
-        <div className="absolute bottom-28 left-[calc(100%+8px)] z-40 w-72 rounded-2xl border border-white/80 bg-white p-4 text-sm shadow-xl shadow-slate-900/10">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="font-semibold text-slate-900">
-              {panel === "settings" ? "Settings" : "Help"}
-            </p>
-            <button
-              type="button"
-              onClick={() => setPanel(null)}
-              className="rounded-full px-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              aria-label="Close"
-            >
-              ×
-            </button>
+        <div className="mx-2 mt-3 hidden rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 p-3.5 text-white shadow-lg shadow-violet-500/25 xl:block">
+          <p className="text-sm font-semibold leading-snug">
+            {isTeacher ? "Empower your students! 📚" : "Keep Learning, Keep Growing! 🚀"}
+          </p>
+          <div className="mt-3 flex gap-1.5">
+            <span className="h-1.5 w-4 rounded-full bg-white" />
+            <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+            <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
           </div>
-          {panel === "settings" ? (
-            <ul className="space-y-2 text-slate-600">
-              <li>Language lives in the top bar.</li>
-              <li>Role badge indicates current permissions.</li>
-              <li>Mentor modes are in Tutor chat.</li>
-            </ul>
-          ) : (
-            <ul className="space-y-2 text-slate-600">
-              <li>Type a question, or tap the mic, speak, then tap again to send.</li>
-              <li>Use Quiz, Interview, Notes, and Progress from this sidebar.</li>
-              <li>Teachers can manage curriculum in the Teacher portal.</li>
-            </ul>
-          )}
+        </div>
+      </aside>
+
+      {/* Global High-Z Modal Overlay for Settings and Help */}
+      {panel && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setPanel(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl border border-white/80 bg-white p-6 shadow-2xl shadow-slate-900/30 transition-all sm:p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                  {panel === "settings" ? (
+                    <SettingsIcon className="h-5 w-5" />
+                  ) : (
+                    <HelpIcon className="h-5 w-5" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {panel === "settings" ? "Application Settings" : "Edu Mentor AI Guide & Help"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {panel === "settings"
+                      ? "Customize your audio, avatar, and learning workspace"
+                      : "Quick tips for an optimal conversational learning experience"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPanel(null)}
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                aria-label="Close modal"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mt-4 max-h-[70vh] overflow-y-auto pr-1">
+              {panel === "settings" ? (
+                <div className="space-y-4 text-xs">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
+                    <h4 className="font-semibold text-slate-800">Account & Permissions</h4>
+                    <p className="mt-0.5 text-slate-500">
+                      Logged in as <strong className="text-slate-700">{user?.full_name || "Guest"}</strong> ({user?.email || "N/A"})
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-bold text-violet-800 uppercase">
+                        {user?.role || "student"}
+                      </span>
+                      {isTeacher && (
+                        <span className="text-[11px] text-indigo-600 font-medium">
+                          ✓ Curriculum upload & student analytics access
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
+                    <h4 className="font-semibold text-slate-800">AI Mentor Voice & Speech</h4>
+                    <ul className="mt-2 space-y-1.5 text-slate-600">
+                      <li>• <strong>Mira</strong>: Warm, friendly foundations (Piper <code>en_US-lessac-medium</code>).</li>
+                      <li>• <strong>Arjun</strong>: Calm, practical DBMS architect (Piper <code>en_US-ryan-medium</code> or adaptive fallback).</li>
+                      <li>• <strong>Tara</strong>: Analytical Deep Learning tutor (Piper <code>en_US-amy-medium</code> or adaptive fallback).</li>
+                      <li>• <strong>Kiran</strong>: Energetic code practitioner (Piper <code>en_US-danny-low</code> or adaptive fallback).</li>
+                    </ul>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
+                    <h4 className="font-semibold text-slate-800">Avatar Motion & Lip Sync</h4>
+                    <p className="mt-1 text-slate-600 leading-relaxed">
+                      Edu-Mentor AI automatically synchronizes facial gestures, eye blinks, and jaw motion with active Piper audio playback. Mouth animation remains stationary during speech pauses and silence.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 text-xs text-slate-600">
+                  <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-3.5">
+                    <h4 className="font-bold text-violet-900">Conversational Voice Interaction</h4>
+                    <p className="mt-1 text-violet-800 leading-relaxed">
+                      Tap the microphone button once to start speaking. When you finish your thought, tap it again to submit your question. The system transcribes your speech via faster-whisper, retrieves subject documents via RAG, and generates the mentor&apos;s answer with voice synthesis.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
+                    <h4 className="font-semibold text-slate-800">Switching Mentors & Subjects</h4>
+                    <p className="mt-1 leading-relaxed">
+                      Use the top pill selector in Tutor chat to switch between Mira, Arjun, Tara, and Kiran. Each mentor brings a distinct teaching philosophy and persona. You can also toggle between Machine Learning, DBMS, and Deep Learning at any time.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
+                    <h4 className="font-semibold text-slate-800">Tutor Modes & Hints</h4>
+                    <p className="mt-1 leading-relaxed">
+                      Switch between <em>Standard</em>, <em>Socratic</em> (asks guiding questions), <em>Code Explainer</em>, and <em>Exam Prep</em> modes using the mode toggle next to the subject pills.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex justify-end border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setPanel(null)}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </aside>
+    </>
   );
 }
 

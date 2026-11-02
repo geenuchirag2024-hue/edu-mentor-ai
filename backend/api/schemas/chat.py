@@ -15,7 +15,7 @@ class ChatRequest(BaseModel):
     use_notes: bool = False
     subject: str = "Machine Learning"
     mentor_id: str = "mira"
-
+    language: str = "en"
 
 
 class ChatResponse(BaseModel):
@@ -26,3 +26,4 @@ class ChatResponse(BaseModel):
     gesture: str = "point"
     response_type: str = "explanation"
     mentor_id: str = "mira"
+    language: str = "en"

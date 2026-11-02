@@ -21,5 +21,8 @@ class ConversationStore:
     def append(self, session_id: str, role: str, content: str) -> None:
         self._sessions[session_id].append(ChatMessage(role=role, content=content))
 
+    def add_turn(self, session_id: str, role: str, content: str) -> None:
+        self.append(session_id, role, content)
+
 
 conversation_store = ConversationStore()

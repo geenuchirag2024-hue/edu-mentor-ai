@@ -1,4 +1,4 @@
-"""Orchestrates STT → RAG/LLM → TTS voice assistant pipeline."""
+"""Orchestrates STT → RAG/LLM → TTS voice assistant pipeline with multilingual support."""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ def prepare_text_query(
     use_notes: bool = False,
     subject: str = "Machine Learning",
     mentor_id: str | None = "mira",
+    language: str | None = "en",
 ) -> tuple[str, list[dict[str, str]], list[str]]:
     """Build session id, LLM messages, and sources without updating history."""
     sid = conversation_store.get_or_create_session(session_id)
@@ -51,6 +52,7 @@ def prepare_text_query(
         extra_system=extra,
         subject=subject,
         mentor_id=mentor_id,
+        language=language,
     )
     return sid, messages, sources
 
@@ -61,13 +63,13 @@ def finalize_text_query(
     answer: str,
     learner_id: str | None = None,
 ) -> None:
-    conversation_store.append(sid, "user", message)
-    conversation_store.append(sid, "assistant", answer)
-    if learner_id:
-        learning_store.record_study(learner_id, message, answer)
+    """Commit user and assistant turns to history and update learner stats."""
+    conversation_store.add_turn(sid, "user", message)
+    conversation_store.add_turn(sid, "assistant", answer)
+    learning_store.record_interaction(learner_id, sid, message, answer)
 
 
-def stream_text_query(
+def process_text_stream(
     message: str,
     session_id: str | None = None,
     for_voice: bool = False,
@@ -77,8 +79,8 @@ def stream_text_query(
     use_notes: bool = False,
     subject: str = "Machine Learning",
     mentor_id: str | None = "mira",
+    language: str | None = "en",
 ) -> tuple[str, Iterator[str], list[str]]:
-    """Return session id, token stream, and sources for SSE chat."""
     sid, messages, sources = prepare_text_query(
         message,
         session_id,
@@ -89,6 +91,7 @@ def stream_text_query(
         use_notes=use_notes,
         subject=subject,
         mentor_id=mentor_id,
+        language=language,
     )
     tokens = get_llm().generate_stream(messages, for_voice=for_voice)
     return sid, tokens, sources
@@ -104,6 +107,7 @@ def process_text_query(
     use_notes: bool = False,
     subject: str = "Machine Learning",
     mentor_id: str | None = "mira",
+    language: str | None = "en",
 ) -> dict:
     sid, messages, sources = prepare_text_query(
         message,
@@ -115,6 +119,7 @@ def process_text_query(
         use_notes=use_notes,
         subject=subject,
         mentor_id=mentor_id,
+        language=language,
     )
     answer = get_llm().generate(messages, for_voice=for_voice)
     finalize_text_query(sid, message, answer, learner_id=learner_id)
@@ -129,6 +134,7 @@ def process_text_query(
         "session_id": sid,
         "sources": sources,
         "mentor_id": mentor_id or "mira",
+        "language": language or "en",
         **cues,
     }
 
@@ -143,12 +149,20 @@ def process_voice_query(
     hint_level: int = 0,
     subject: str = "Machine Learning",
     mentor_id: str | None = "mira",
+    language: str | None = "en",
 ) -> dict:
-    transcript = get_stt().transcribe(audio_bytes, filename=filename)
+    transcript = get_stt().transcribe(audio_bytes, filename=filename, language=language)
 
     if not transcript.strip():
-        fallback = "I didn't catch that. Could you please repeat your question?"
-        audio = get_tts().synthesize(fallback)
+        lang_code = (language or "en").lower().strip()
+        if lang_code.startswith("hi"):
+            fallback = "मुझे आपकी आवाज़ स्पष्ट नहीं सुनाई दी। क्या आप अपना प्रश्न दोहरा सकते हैं?"
+        elif lang_code.startswith("kn"):
+            fallback = "ನಿಮ್ಮ ಧ್ವನಿ ಸ್ಪಷ್ಟವಾಗಿ ಕೇಳಿಸಲಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಪುನರಾವರ್ತಿಸಿ."
+        else:
+            fallback = "I didn't catch that. Could you please repeat your question?"
+
+        audio = get_tts().synthesize(fallback, mentor_id=mentor_id, language=language)
         sid = conversation_store.get_or_create_session(session_id)
         return {
             "transcript": "",
@@ -160,6 +174,7 @@ def process_voice_query(
             "gesture": "wave",
             "response_type": "greeting",
             "mentor_id": mentor_id or "mira",
+            "language": language or "en",
         }
 
     result = process_text_query(
@@ -172,8 +187,9 @@ def process_voice_query(
         use_notes=use_notes,
         subject=subject,
         mentor_id=mentor_id,
+        language=language,
     )
-    audio = get_tts().synthesize(result["answer"])
+    audio = get_tts().synthesize(result["answer"], mentor_id=mentor_id, language=language)
 
     return {
         "transcript": transcript,
@@ -185,5 +201,5 @@ def process_voice_query(
         "gesture": result.get("gesture", "none"),
         "response_type": result.get("response_type", "explanation"),
         "mentor_id": mentor_id or "mira",
+        "language": language or "en",
     }
-

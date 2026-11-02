@@ -7,6 +7,8 @@ export interface VoiceQueryResponse {
   emotion?: MascotEmotion;
   gesture?: MascotGesture;
   response_type?: string;
+  mentor_id?: string;
+  language?: string;
 }
 
 export type MascotState = "idle" | "listening" | "thinking" | "speaking";

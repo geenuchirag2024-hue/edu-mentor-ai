@@ -1,8 +1,9 @@
-"""Text-to-speech using Piper in a child process (avoids native crashes)."""
+"""Text-to-speech using Piper with multi-mentor voice assignment and fallbacks."""
 
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 import struct
@@ -12,8 +13,10 @@ import threading
 import wave
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from backend.config import get_settings
+from backend.services.mentor_registry import get_mentor_voice_config, normalize_mentor_id
 from backend.utils.tts_text import prepare_text_for_speech
 
 logger = logging.getLogger(__name__)
@@ -25,20 +28,62 @@ _CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 class TTSService:
     def __init__(self) -> None:
         self.settings = get_settings()
-        self._voice = None
-        self._proc: subprocess.Popen[bytes] | None = None
+        self._workers: dict[str, subprocess.Popen[bytes]] = {}
         self._lock = threading.Lock()
-        self._stderr_thread: threading.Thread | None = None
+        self._reported_fallbacks: set[str] = set()
 
-    def _voice_path(self) -> Path:
-        voice_dir = Path(self.settings.piper_model_dir) / self.settings.piper_voice
-        onnx = voice_dir / f"{self.settings.piper_voice}.onnx"
-        if not onnx.exists():
-            onnx = voice_dir / "model.onnx"
-        return onnx
+    def resolve_mentor_voice(
+        self,
+        mentor_id: str | None = None,
+        language: str | None = "en",
+    ) -> tuple[Path, dict[str, Any], bool]:
+        """Resolve model path and voice config for a mentor and language.
+
+        Returns:
+            (model_path, voice_config, is_actual_target_model)
+        """
+        clean_id = normalize_mentor_id(mentor_id)
+        voice_cfg = get_mentor_voice_config(clean_id, language=language)
+        target_model = voice_cfg.get("voice_model", self.settings.piper_voice)
+        fallback_model = voice_cfg.get("fallback_voice", "en_US-lessac-medium")
+
+        base_dir = Path(self.settings.piper_model_dir)
+
+        # 1. Check target model
+        target_path = base_dir / target_model / f"{target_model}.onnx"
+        if not target_path.exists():
+            alt_path = base_dir / target_model / "model.onnx"
+            if alt_path.exists():
+                target_path = alt_path
+
+        if target_path.exists():
+            return target_path, voice_cfg, True
+
+        # 2. Check fallback model
+        fallback_path = base_dir / fallback_model / f"{fallback_model}.onnx"
+        if not fallback_path.exists():
+            alt_fallback = base_dir / fallback_model / "model.onnx"
+            if alt_fallback.exists():
+                fallback_path = alt_fallback
+
+        cache_key = f"{clean_id}:{language}"
+        if cache_key not in self._reported_fallbacks and clean_id != "mira":
+            self._reported_fallbacks.add(cache_key)
+            logger.info(
+                "[TTS] Mentor '%s' (lang=%s) configured voice '%s' not installed at %s. "
+                "Using fallback '%s' with mentor voice parameter tuning.",
+                clean_id,
+                language,
+                target_model,
+                target_path,
+                fallback_model,
+            )
+
+        return fallback_path, voice_cfg, False
 
     def _load(self) -> None:
-        onnx_path = self._voice_path()
+        """Preload the default voice model at startup."""
+        onnx_path, _, _ = self.resolve_mentor_voice("mira")
         if not onnx_path.exists():
             logger.warning(
                 "Piper voice not found at %s — using silent WAV fallback. "
@@ -49,15 +94,18 @@ class TTSService:
         with self._lock:
             self._ensure_worker(onnx_path)
 
-    def _ensure_worker(self, onnx_path: Path) -> None:
-        if self._proc is not None and self._proc.poll() is None:
-            return
-        self._stop_worker()
+    def _ensure_worker(self, onnx_path: Path) -> subprocess.Popen[bytes]:
+        key = str(onnx_path.resolve())
+        existing = self._workers.get(key)
+        if existing is not None and existing.poll() is None:
+            return existing
+
+        self._stop_worker(key)
         logger.info("Starting Piper worker from %s", onnx_path)
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
         env.setdefault("ORT_LOG_SEVERITY_LEVEL", "3")
-        self._proc = subprocess.Popen(
+        proc = subprocess.Popen(
             [sys.executable, str(_WORKER_SCRIPT), str(onnx_path)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -67,21 +115,23 @@ class TTSService:
             bufsize=0,
             creationflags=_CREATE_NO_WINDOW,
         )
-        if self._proc.stderr is not None:
-            self._stderr_thread = threading.Thread(
+        if proc.stderr is not None:
+            t = threading.Thread(
                 target=self._drain_stderr,
-                args=(self._proc.stderr,),
+                args=(proc.stderr,),
                 daemon=True,
             )
-            self._stderr_thread.start()
-        self._wait_ready(self._proc)
+            t.start()
+        self._wait_ready(proc)
+        self._workers[key] = proc
+        return proc
 
     @staticmethod
     def _wait_ready(proc: subprocess.Popen[bytes]) -> None:
         if proc.stdout is None:
             raise RuntimeError("Piper worker has no stdout")
         buf = b""
-        while b"RDY\n" not in buf:
+        while b"READY\n" not in buf and b"RDY\n" not in buf:
             chunk = proc.stdout.read(1)
             if not chunk:
                 raise RuntimeError("Piper worker exited before becoming ready")
@@ -89,9 +139,8 @@ class TTSService:
             if len(buf) > 8192:
                 raise RuntimeError("Piper worker sent unexpected stdout before ready")
 
-    def _stop_worker(self) -> None:
-        proc = self._proc
-        self._proc = None
+    def _stop_worker(self, key: str) -> None:
+        proc = self._workers.pop(key, None)
         if proc is None:
             return
         try:
@@ -135,13 +184,12 @@ class TTSService:
             raise error[0]
         return chunks[0] if chunks else b""
 
-    def _ask_worker(self, text: str) -> bytes:
-        onnx_path = self._voice_path()
-        payload = text.encode("utf-8")
+    def _ask_worker(self, onnx_path: Path, payload_str: str) -> bytes:
+        key = str(onnx_path.resolve())
+        payload = payload_str.encode("utf-8")
         last_error: Exception | None = None
         for attempt in range(2):
-            self._ensure_worker(onnx_path)
-            proc = self._proc
+            proc = self._ensure_worker(onnx_path)
             if proc is None or proc.stdin is None or proc.stdout is None:
                 raise RuntimeError("Piper worker failed to start")
             try:
@@ -161,23 +209,45 @@ class TTSService:
             except Exception as exc:
                 last_error = exc
                 logger.warning("Piper worker attempt %s failed: %s", attempt + 1, exc)
-                self._stop_worker()
+                self._stop_worker(key)
         raise RuntimeError(str(last_error) if last_error else "Piper worker failed")
 
-    def synthesize(self, text: str) -> bytes:
+    def synthesize(
+        self,
+        text: str,
+        mentor_id: str | None = None,
+        language: str | None = "en",
+    ) -> bytes:
+        """Synthesize speech audio for the specified mentor and language."""
         speech_text = prepare_text_for_speech(text)
         if not speech_text.strip():
             return self._silent_wav()
 
-        onnx_path = self._voice_path()
+        onnx_path, voice_cfg, _ = self.resolve_mentor_voice(mentor_id, language=language)
         if not onnx_path.exists():
             return self._silent_wav(duration_ms=max(500, len(speech_text) * 30))
 
+        if not voice_cfg.get("is_supported", True):
+            logger.info(
+                "[TTS] Language '%s' is not natively supported by Piper (%s). Using fallback voice %s.",
+                language,
+                voice_cfg.get("unsupported_reason", ""),
+                onnx_path.name,
+            )
+
+        payload_obj = {
+            "text": speech_text,
+            "length_scale": voice_cfg.get("speaking_rate", 1.0),
+            "noise_scale": voice_cfg.get("noise_scale"),
+            "noise_w": voice_cfg.get("noise_w"),
+        }
+        payload_str = json.dumps(payload_obj)
+
         with self._lock:
             try:
-                wav = self._ask_worker(speech_text)
+                wav = self._ask_worker(onnx_path, payload_str)
             except Exception as exc:
-                logger.error("Piper synthesize failed: %s", exc)
+                logger.error("Piper synthesize failed for mentor %s (lang=%s): %s", mentor_id, language, exc)
                 return self._silent_wav(duration_ms=max(500, min(len(speech_text) * 30, 8000)))
 
         if not wav or len(wav) < 44:

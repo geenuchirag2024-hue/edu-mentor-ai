@@ -1,6 +1,5 @@
 """Tests for Phase 3: Centralized Mentor Registry and Multi-Mentor Support."""
 
-import pytest
 from unittest.mock import patch
 from backend.services.mentor_registry import (
     DEFAULT_MENTOR_ID,

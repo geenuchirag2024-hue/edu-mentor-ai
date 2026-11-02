@@ -1,21 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "hi", label: "Hindi" },
-  { code: "ta", label: "Tamil" },
-  { code: "te", label: "Telugu" },
-  { code: "kn", label: "Kannada" },
-  { code: "ml", label: "Malayalam" },
-  { code: "bn", label: "Bengali" },
-  { code: "mr", label: "Marathi" },
-  { code: "gu", label: "Gujarati" },
+export const SUPPORTED_LANGUAGES = [
+  { code: "en", label: "English", native: "English", tts: true },
+  { code: "hi", label: "Hindi", native: "हिन्दी", tts: true },
+  { code: "kn", label: "Kannada", native: "ಕನ್ನಡ", tts: false },
+  { code: "ta", label: "Tamil", native: "தமிழ்", tts: false },
+  { code: "te", label: "Telugu", native: "తెలుగు", tts: false },
+  { code: "ml", label: "Malayalam", native: "മലയാളം", tts: false },
+  { code: "bn", label: "Bengali", native: "বাংলা", tts: false },
+  { code: "mr", label: "Marathi", native: "मराठी", tts: false },
+  { code: "gu", label: "Gujarati", native: "ગુજરાતી", tts: false },
 ];
 
 export default function LanguageSelector() {
   const [locale, setLocale] = useState("en");
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("edu_mentor_language");
+      if (stored) setLocale(stored);
+    } catch {}
+
+    const handleLanguageChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ language: string }>;
+      if (customEvent.detail?.language) {
+        setLocale(customEvent.detail.language);
+      }
+    };
+
+    window.addEventListener("edu_mentor_language_changed", handleLanguageChange);
+    return () => {
+      window.removeEventListener("edu_mentor_language_changed", handleLanguageChange);
+    };
+  }, []);
+
+  const handleChange = (newLocale: string) => {
+    setLocale(newLocale);
+    try {
+      localStorage.setItem("edu_mentor_language", newLocale);
+    } catch {}
+    window.dispatchEvent(
+      new CustomEvent("edu_mentor_language_changed", {
+        detail: { language: newLocale },
+      })
+    );
+  };
 
   return (
     <label className="relative inline-flex items-center">
@@ -27,13 +58,13 @@ export default function LanguageSelector() {
       </span>
       <select
         value={locale}
-        onChange={(e) => setLocale(e.target.value)}
-        className="appearance-none rounded-full border border-white/80 bg-white/90 py-1.5 pl-8 pr-7 text-sm font-medium text-slate-600 shadow-sm"
+        onChange={(e) => handleChange(e.target.value)}
+        className="appearance-none rounded-full border border-white/80 bg-white/90 py-1.5 pl-8 pr-7 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
         aria-label="Select language"
       >
-        {LANGUAGES.map((lang) => (
+        {SUPPORTED_LANGUAGES.map((lang) => (
           <option key={lang.code} value={lang.code}>
-            {lang.label}
+            {lang.label} ({lang.native})
           </option>
         ))}
       </select>

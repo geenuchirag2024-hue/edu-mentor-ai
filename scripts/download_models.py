@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download all AI models required by Edu Mentor AI."""
+"""Download AI models required by Edu Mentor AI, with optional mentor voice packs."""
 
 from __future__ import annotations
 
@@ -11,15 +11,22 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 MODELS_DIR = PROJECT_ROOT / "data" / "models"
-PIPER_DIR = MODELS_DIR / "piper" / "en_US-lessac-medium"
+PIPER_DIR = MODELS_DIR / "piper"
 
 # Qwen3-4B-Instruct Q4_K_M — good default for 8-16GB RAM dev machines
 DEFAULT_QWEN_REPO = "DhruvalLabs/Qwen3-4B-Instruct-2507-GGUF"
 DEFAULT_QWEN_FILE = "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
 
-PIPER_BASE_URL = (
-    "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium"
-)
+# Piper Voice Repositories (Hugging Face rhasspy/piper-voices)
+PIPER_VOICE_URLS = {
+    "en_US-lessac-medium": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium",  # Mira (default)
+    "en_US-ryan-medium": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium",      # Arjun
+    "en_US-amy-medium": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium",        # Tara
+    "en_US-danny-low": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/danny/low",          # Kiran
+    "hi_IN-priyamvada-medium": "https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/priyamvada/medium",  # Mira/Tara (Hindi)
+    "hi_IN-rohan-medium": "https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/rohan/medium",            # Arjun (Hindi)
+    "hi_IN-pratham-medium": "https://huggingface.co/rhasspy/piper-voices/resolve/main/hi/hi_IN/pratham/medium",        # Kiran (Hindi)
+}
 
 
 def download_qwen(repo: str, filename: str, dest: Path) -> bool:
@@ -67,26 +74,33 @@ def warmup_whisper(model_size: str = "base") -> bool:
         return False
 
 
-def download_piper() -> bool:
+def download_piper_voice(voice_name: str) -> bool:
+    base_url = PIPER_VOICE_URLS.get(voice_name)
+    if not base_url:
+        print(f"  [error] Unknown Piper voice: {voice_name}")
+        return False
+
+    voice_dir = PIPER_DIR / voice_name
+    voice_dir.mkdir(parents=True, exist_ok=True)
+
     try:
         import urllib.request
 
-        PIPER_DIR.mkdir(parents=True, exist_ok=True)
         files = {
-            "en_US-lessac-medium.onnx": f"{PIPER_BASE_URL}/en_US-lessac-medium.onnx",
-            "en_US-lessac-medium.onnx.json": f"{PIPER_BASE_URL}/en_US-lessac-medium.onnx.json",
+            f"{voice_name}.onnx": f"{base_url}/{voice_name}.onnx",
+            f"{voice_name}.onnx.json": f"{base_url}/{voice_name}.onnx.json",
         }
         for name, url in files.items():
-            dest = PIPER_DIR / name
+            dest = voice_dir / name
             if dest.exists() and dest.stat().st_size > 1000:
                 print(f"  [skip] Piper {name} exists")
                 continue
-            print(f"  Downloading Piper {name}...")
+            print(f"  Downloading Piper {name} from {url}...")
             urllib.request.urlretrieve(url, dest)
-            print(f"  [ok] {dest}")
+            print(f"  [ok] Saved {dest}")
         return True
     except Exception as exc:
-        print(f"  [fail] Piper: {exc}")
+        print(f"  [fail] Piper {voice_name}: {exc}")
         return False
 
 
@@ -96,6 +110,11 @@ def main() -> int:
     parser.add_argument("--qwen-file", default=DEFAULT_QWEN_FILE)
     parser.add_argument("--skip-qwen", action="store_true")
     parser.add_argument("--whisper", default="base")
+    parser.add_argument(
+        "--all-piper-voices",
+        action="store_true",
+        help="Download distinct Piper voice models for all 4 mentors (Mira, Arjun, Tara, Kiran)",
+    )
     args = parser.parse_args()
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -120,7 +139,17 @@ def main() -> int:
     results["whisper"] = warmup_whisper(args.whisper)
 
     print("\n[4/4] Text-to-speech (Piper)")
-    results["piper"] = download_piper()
+    results["piper-mira"] = download_piper_voice("en_US-lessac-medium")
+
+    if args.all_piper_voices:
+        print("  Downloading additional mentor voices...")
+        results["piper-arjun"] = download_piper_voice("en_US-ryan-medium")
+        results["piper-tara"] = download_piper_voice("en_US-amy-medium")
+        results["piper-kiran"] = download_piper_voice("en_US-danny-low")
+        print("  Downloading Hindi multilingual mentor voices...")
+        results["piper-hindi-priyamvada"] = download_piper_voice("hi_IN-priyamvada-medium")
+        results["piper-hindi-rohan"] = download_piper_voice("hi_IN-rohan-medium")
+        results["piper-hindi-pratham"] = download_piper_voice("hi_IN-pratham-medium")
 
     print("\n=== Summary ===")
     for name, ok in results.items():

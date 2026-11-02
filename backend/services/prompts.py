@@ -44,6 +44,7 @@ def build_tutor_messages(
     extra_system: str | None = None,
     subject: str = "Machine Learning",
     mentor_id: str | None = None,
+    language: str | None = "en",
 ) -> list[dict[str, str]]:
     from backend.services.mentor_registry import get_mentor_prompt
     from backend.services.tutor_modes import hint_addendum, mode_addendum
@@ -53,6 +54,22 @@ def build_tutor_messages(
     system += hint_addendum(hint_level)
     if extra_system:
         system += "\n" + extra_system
+
+    # Multilingual response instruction
+    lang_code = (language or "en").lower().strip()
+    if lang_code.startswith("hi"):
+        system += (
+            "\n\nLANGUAGE INSTRUCTION: The student is communicating in Hindi (हिन्दी). "
+            "Formulate your entire response in clear, fluent, natural Hindi (using Devanagari script) "
+            "while preserving technical terms and your mentor personality."
+        )
+    elif lang_code.startswith("kn"):
+        system += (
+            "\n\nLANGUAGE INSTRUCTION: The student is communicating in Kannada (ಕನ್ನಡ). "
+            "Formulate your response in clear, friendly Kannada (using Kannada script) "
+            "while preserving core technical clarity and your mentor personality."
+        )
+
     if for_voice:
         system += VOICE_TUTOR_ADDENDUM
     else:

@@ -156,25 +156,21 @@ export function useMascotAnimation({
         pose.mouthOpen = lerp(pose.mouthOpen, 0.02, 0.18);
       } else if (currentState === "speaking") {
         const lip = getLipSyncRef.current?.() ?? null;
-        const chatter =
-          (0.14 +
-            Math.abs(Math.sin(t * 13.2)) * 0.42 +
-            Math.abs(Math.sin(t * 21.0)) * 0.2) *
-          motion;
         const driven = lip ? lip.mouthOpen : 0;
-        // Follow audio when present; keep a speech rhythm so lips never freeze
-        // if the analyser drops a frame.
-        const open =
-          driven > 0.045 ? Math.min(1, driven * 1.08 + chatter * 0.18) : chatter;
-        pose.mouthOpen = lerp(pose.mouthOpen, open, 0.72);
-        if (lip) {
+        // Strictly audio-driven: mouth opens when audio amplitude is present.
+        // During pauses, breath stops, or silence, mouth closes cleanly.
+        const open = driven > 0.04 ? Math.min(1, driven * 1.15) : 0;
+        pose.mouthOpen = lerp(pose.mouthOpen, open, open > 0 ? 0.65 : 0.35);
+        if (lip && open > 0) {
           pose.mouthWidth = lerp(pose.mouthWidth, lip.mouthWidth, 0.45);
+        } else {
+          pose.mouthWidth = lerp(pose.mouthWidth, 1.0, 0.25);
         }
         pose.headNod =
-          (Math.sin(t * 2.1) * 0.45 + Math.sin(t * 3.2) * 0.12) * motion;
-        pose.headRot = Math.sin(t * 1.35) * 0.55 * motion;
+          (Math.sin(t * 1.8) * 0.35 + Math.sin(t * 2.8) * 0.1) * motion;
+        pose.headRot = Math.sin(t * 1.2) * 0.4 * motion;
         pose.browRaise =
-          (target.browRaise ?? 0) + Math.sin(t * 2.4) * 0.12 * motion;
+          (target.browRaise ?? 0) + Math.sin(t * 2.0) * 0.08 * motion;
       } else {
         pose.mouthOpen = lerp(pose.mouthOpen, target.mouthOpen ?? 0, 0.2);
         pose.smile = lerp(

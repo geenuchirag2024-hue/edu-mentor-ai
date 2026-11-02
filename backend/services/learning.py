@@ -183,6 +183,17 @@ class LearningStore:
             self._save()
             return json.loads(json.dumps(profile))
 
+    def record_interaction(
+        self,
+        learner_id: str | None,
+        session_id: str | None,
+        message: str,
+        answer: str,
+    ) -> dict | None:
+        if not learner_id:
+            return None
+        return self.record_study(learner_id, message, answer)
+
     def record_answers(
         self,
         learner_id: str,

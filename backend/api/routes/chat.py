@@ -12,7 +12,7 @@ from backend.db.models import User
 from backend.services.assistant_pipeline import (
     finalize_text_query,
     process_text_query,
-    stream_text_query,
+    process_text_stream,
 )
 
 from backend.services.mentor_registry import list_mentors
@@ -44,6 +44,7 @@ async def chat(
         request.use_notes,
         request.subject,
         request.mentor_id,
+        request.language,
     )
     return ChatResponse(
         answer=result["answer"],
@@ -53,6 +54,7 @@ async def chat(
         gesture=result.get("gesture", "point"),
         response_type=result.get("response_type", "explanation"),
         mentor_id=result.get("mentor_id", request.mentor_id),
+        language=result.get("language", request.language),
     )
 
 
@@ -68,7 +70,7 @@ async def chat_stream(
 
         def produce() -> None:
             try:
-                sid, token_iter, sources = stream_text_query(
+                sid, token_iter, sources = process_text_stream(
                     request.message,
                     request.session_id,
                     False,
@@ -78,9 +80,10 @@ async def chat_stream(
                     request.use_notes,
                     request.subject,
                     request.mentor_id,
+                    request.language,
                 )
 
-                event_queue.put(("meta", {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id}))
+                event_queue.put(("meta", {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id, "language": request.language}))
                 answer_parts: list[str] = []
                 for token in token_iter:
                     answer_parts.append(token)

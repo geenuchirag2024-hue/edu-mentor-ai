@@ -18,8 +18,8 @@ export interface ChatRequest {
   use_notes?: boolean;
   subject?: string;
   mentor_id?: string;
+  language?: string;
 }
-
 
 export interface ChatResponse {
   answer: string;
@@ -29,4 +29,5 @@ export interface ChatResponse {
   gesture?: string;
   response_type?: string;
   mentor_id?: string;
+  language?: string;
 }

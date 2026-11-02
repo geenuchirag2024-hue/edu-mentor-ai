@@ -1,4 +1,4 @@
-"""Speech-to-text using faster-whisper."""
+"""Speech-to-text using faster-whisper with multilingual language support."""
 
 from __future__ import annotations
 
@@ -31,7 +31,12 @@ class STTService:
         )
         logger.info("Loaded Whisper model: %s", self.settings.whisper_model)
 
-    def transcribe(self, audio_bytes: bytes, filename: str = "audio.wav") -> str:
+    def transcribe(
+        self,
+        audio_bytes: bytes,
+        filename: str = "audio.wav",
+        language: str | None = None,
+    ) -> str:
         if not audio_bytes:
             return ""
 
@@ -42,10 +47,10 @@ class STTService:
         os.close(fd)
         Path(tmp_path).write_bytes(audio_bytes)
 
-        logger.info("STT input: %d bytes, model=%s", len(audio_bytes), self.settings.whisper_model)
+        logger.info("STT input: %d bytes, model=%s, lang=%s", len(audio_bytes), self.settings.whisper_model, language)
 
         try:
-            text = self._transcribe_file(tmp_path, vad_filter=False)
+            text = self._transcribe_file(tmp_path, vad_filter=False, language=language)
             if looks_like_hallucination(text):
                 logger.info("STT hallucination filtered: '%s'", text)
                 return ""
@@ -57,17 +62,37 @@ class STTService:
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
-    def _transcribe_file(self, path: str, vad_filter: bool) -> str:
+    def _transcribe_file(
+        self,
+        path: str,
+        vad_filter: bool,
+        language: str | None = None,
+    ) -> str:
+        lang = language.lower().strip() if language else None
+        if lang in ("auto", "", "none"):
+            lang = None
+        elif lang.startswith("hi"):
+            lang = "hi"
+        elif lang.startswith("kn"):
+            lang = "kn"
+        elif lang.startswith("en"):
+            lang = "en"
+
         segments, info = self._model.transcribe(
             path,
             beam_size=1,
-            language="en",
+            language=lang,
             vad_filter=vad_filter,
             condition_on_previous_text=False,
             without_timestamps=True,
         )
         text = " ".join(segment.text.strip() for segment in segments).strip()
-        logger.info("STT lang=%s vad=%s", getattr(info, "language", "?"), vad_filter)
+        logger.info(
+            "STT requested_lang=%s detected_lang=%s vad=%s",
+            lang,
+            getattr(info, "language", "?"),
+            vad_filter,
+        )
         return text
 
 

@@ -43,23 +43,23 @@ export default function MiraStage({
 
   return (
     <div
-      className={`mira-presence-panel relative flex min-h-0 flex-col items-center ${
+      className={`mira-presence-panel relative z-0 flex min-h-0 flex-col items-center ${
         fill ? "h-full" : "h-full"
       }`}
     >
       {speaking && (
-        <div className="mira-speak-chip pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5 rounded-full bg-slate-900/80 px-2.5 py-1 text-[11px] font-medium text-white shadow-md backdrop-blur-md">
+        <div className="mira-speak-chip pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1.5 rounded-full bg-slate-900/80 px-2.5 py-1 text-[11px] font-medium text-white shadow-md backdrop-blur-md">
           <SpeakingWaveform active audioLevelRef={audioLevelRef} />
           Speaking...
         </div>
       )}
       {state === "listening" && (
-        <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-medium text-white shadow-md">
+        <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-medium text-white shadow-md">
           Listening...
         </div>
       )}
       {state === "thinking" && (
-        <div className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-medium text-violet-700 shadow-md">
+        <div className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-medium text-violet-700 shadow-md">
           Thinking
           <span className="mira-think-dots" aria-hidden>
             <span />
@@ -69,7 +69,7 @@ export default function MiraStage({
         </div>
       )}
       {state === "idle" && !liveCaption && (
-        <div className="pointer-events-none absolute right-2 top-2 z-30 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+        <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
           Ready to help
         </div>
       )}

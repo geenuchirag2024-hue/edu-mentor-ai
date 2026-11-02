@@ -53,7 +53,17 @@ def setup_test_db():
             session.add_all([student, teacher])
             await session.commit()
 
-    asyncio.run(_init())
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(asyncio.run, _init()).result()
+    else:
+        asyncio.run(_init())
     yield
 
 

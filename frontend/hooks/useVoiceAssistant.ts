@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { streamChatMessage } from "@/services/chatService";
 import { sendVoiceQuery, synthesizeSpeech } from "@/services/voiceService";
 import { getLearnerId } from "@/services/learner";
@@ -36,6 +36,12 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   const [hintLevel, setHintLevel] = useState(0);
   const [subject, setSubject] = useState<string>("Machine Learning");
   const [mentorId, setMentorIdState] = useState<MentorId>(DEFAULT_MENTOR_ID);
+  const [language, setLanguageState] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("edu_mentor_language") || "en";
+    }
+    return "en";
+  });
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
@@ -47,8 +53,26 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   subjectRef.current = subject;
   const mentorIdRef = useRef(mentorId);
   mentorIdRef.current = mentorId;
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const abortRef = useRef<AbortController | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ language?: string }>).detail;
+      const next = detail?.language || localStorage.getItem("edu_mentor_language") || "en";
+      setLanguageState(next);
+      languageRef.current = next;
+    };
+    window.addEventListener("edu_mentor_language_changed", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("edu_mentor_language_changed", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
 
 
   const setMascot = useCallback((state: MascotState) => {
@@ -106,9 +130,33 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
 
   const setMentorId = useCallback((newId: MentorId) => {
     cancelTurn();
+    setIsSpeaking(false);
+    setSpeakingMessageId(null);
+    setStatusMessage(null);
+    setMascot("idle");
+    optionsRef.current.onSpeakingChange?.(false);
     setMentorIdState(newId);
     mentorIdRef.current = newId;
-  }, [cancelTurn]);
+  }, [cancelTurn, setMascot]);
+
+  const setLanguage = useCallback((newLang: string) => {
+    cancelTurn();
+    setIsSpeaking(false);
+    setSpeakingMessageId(null);
+    setStatusMessage(null);
+    setMascot("idle");
+    optionsRef.current.onSpeakingChange?.(false);
+    setLanguageState(newLang);
+    languageRef.current = newLang;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("edu_mentor_language", newLang);
+      window.dispatchEvent(
+        new CustomEvent("edu_mentor_language_changed", {
+          detail: { language: newLang },
+        })
+      );
+    }
+  }, [cancelTurn, setMascot]);
 
   const playAnswerAudio = useCallback(
     async (
@@ -123,7 +171,12 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
       }
       try {
         setStatusMessage("Preparing voice...");
-        const audioBase64 = await synthesizeSpeech(answer, signal);
+        const audioBase64 = await synthesizeSpeech(
+          answer,
+          mentorIdRef.current,
+          languageRef.current,
+          signal
+        );
         if (signal?.aborted) {
           setMascot("idle");
           onReadyToSpeak?.();
@@ -179,6 +232,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
             learner_id: getLearnerId(),
             subject: subjectRef.current,
             mentor_id: mentorIdRef.current,
+            language: languageRef.current,
           },
           {
             onToken: (token) => {
@@ -307,6 +361,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
             learner_id: getLearnerId(),
             subject: subjectRef.current,
             mentor_id: mentorIdRef.current,
+            language: languageRef.current,
           },
           controller.signal
         );
@@ -376,6 +431,8 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     setSubject,
     mentorId,
     setMentorId,
+    language,
+    setLanguage,
     sendText,
     sendVoice,
     startListening,
