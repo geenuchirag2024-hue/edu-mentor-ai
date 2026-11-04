@@ -7,9 +7,7 @@ import ChatInput from "@/components/chat/ChatInput";
 import MiraStage from "@/components/mascot/MiraStage";
 import AudioPlayer from "@/components/voice/AudioPlayer";
 import type { AudioPlayerHandle } from "@/components/voice/AudioPlayer";
-import ModeSelector from "@/components/tutor/ModeSelector";
 import MicButton from "@/components/voice/MicButton";
-import MentorSelector from "@/components/mentor/MentorSelector";
 import { getMentorProfile } from "@/services/mentors";
 import { currentSpokenCaption } from "@/components/chat/speechReveal";
 import RelatedVideoPopup from "@/components/RelatedVideoPopup";
@@ -122,50 +120,40 @@ export default function ChatPage() {
   return (
     <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,28vh)_minmax(0,1fr)] gap-3 md:grid-cols-[minmax(0,1fr)_minmax(280px,34%)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
       <section className="glass-panel order-2 flex min-h-0 min-w-0 flex-col overflow-hidden md:order-1">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-100/80 px-4 py-2.5 sm:px-5">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
-              </svg>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-100/80 dark:border-slate-800 px-4 py-2.5 sm:px-5">
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-xl ring-2 ring-violet-500/30">
+              <img
+                src={currentMentor.avatar}
+                alt={currentMentor.name}
+                className="h-full w-full object-cover"
+              />
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900">Chat with {currentMentor.name}</h2>
+                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Chat with {currentMentor.name}</h2>
                 <span className="h-2 w-2 rounded-full bg-emerald-500" title="Online" />
               </div>
-              <p className="text-[11px] font-medium text-slate-400">
-                Mentor: <span className="font-semibold text-violet-600">{currentMentor.title}</span> • Subject: <span className="font-semibold text-violet-600">{assistant.subject}</span>
+              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-400">
+                Mentor: <span className="font-semibold text-violet-600 dark:text-violet-400">{currentMentor.title}</span> • Subject: <span className="font-semibold text-violet-600 dark:text-violet-400">{assistant.subject}</span>
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <MentorSelector
-              selectedMentor={assistant.mentorId}
-              onSelectMentor={assistant.setMentorId}
-              disabled={assistant.isProcessing}
-            />
-            <div className="flex items-center rounded-xl bg-slate-100/90 p-0.5 text-xs">
-              {(["Machine Learning", "DBMS", "Deep Learning"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => assistant.setSubject(s)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                    assistant.subject === s
-                      ? "bg-white text-violet-700 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-            <ModeSelector
-              compact
-              value={assistant.tutorMode}
-              onChange={assistant.setTutorMode}
-            />
+          <div className="flex items-center gap-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 p-1 text-xs">
+            {(["Machine Learning", "DBMS", "Deep Learning"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => assistant.setSubject(s)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  assistant.subject === s
+                    ? "bg-white dark:bg-slate-700 text-violet-700 dark:text-violet-300 shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
           </div>
         </div>
 

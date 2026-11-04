@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import uuid
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.database import Base
@@ -59,6 +59,16 @@ class User(Base):
     )
     query_logs: Mapped[list["AIQueryLog"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+    attendance_records: Mapped[list["AttendanceRecord"]] = relationship(
+        back_populates="student",
+        foreign_keys="[AttendanceRecord.student_id]",
+        cascade="all, delete-orphan",
+    )
+    leave_letters: Mapped[list["LeaveLetter"]] = relationship(
+        back_populates="student",
+        foreign_keys="[LeaveLetter.student_id]",
+        cascade="all, delete-orphan",
     )
 
 
@@ -275,3 +285,51 @@ class AIQueryLog(Base):
 
     user: Mapped[User] = relationship(back_populates="query_logs")
     document: Mapped[Document | None] = relationship(back_populates="queries")
+
+
+# =========================================================================
+# V3: Teacher Attendance Management & Student Leave Letters
+# =========================================================================
+
+class AttendanceRecord(Base):
+    __tablename__ = "attendance_records"
+    __table_args__ = (
+        UniqueConstraint("student_id", "date", "subject", name="uq_student_date_subject"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    teacher_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)  # YYYY-MM-DD
+    subject: Mapped[str] = mapped_column(String(100), default="Machine Learning", nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="present", nullable=False)  # present, absent, late
+    remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), server_default=func.now(), onupdate=func.now()
+    )
+
+    student: Mapped[User] = relationship(foreign_keys=[student_id], back_populates="attendance_records")
+    teacher: Mapped[User | None] = relationship(foreign_keys=[teacher_id])
+
+
+class LeaveLetter(Base):
+    __tablename__ = "leave_letters"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    start_date: Mapped[str] = mapped_column(String(10), nullable=False)  # YYYY-MM-DD
+    end_date: Mapped[str] = mapped_column(String(10), nullable=False)    # YYYY-MM-DD
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending", nullable=False, index=True
+    )  # pending, approved, rejected
+    teacher_remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), server_default=func.now(), index=True)
+
+    student: Mapped[User] = relationship(foreign_keys=[student_id], back_populates="leave_letters")
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])
+

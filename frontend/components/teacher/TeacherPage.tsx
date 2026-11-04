@@ -44,14 +44,18 @@ interface MaterialItem {
   chunks_count?: number;
 }
 
-export default function TeacherPage() {
+export default function TeacherPage({
+  initialTab = "overview",
+}: {
+  initialTab?: "overview" | "materials" | "analytics" | "mentors" | "students" | "quizzes";
+}) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [overview, setOverview] = useState<TeacherOverview | null>(null);
   const [students, setStudents] = useState<AuthUser[]>([]);
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string>("Machine Learning");
-  const [activeTab, setActiveTab] = useState<"overview" | "materials" | "analytics" | "mentors" | "students" | "quizzes">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "materials" | "analytics" | "mentors" | "students" | "quizzes">(initialTab);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);

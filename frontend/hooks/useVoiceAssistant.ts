@@ -35,7 +35,13 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   const [tutorMode, setTutorMode] = useState<TutorMode>("teacher");
   const [hintLevel, setHintLevel] = useState(0);
   const [subject, setSubject] = useState<string>("Machine Learning");
-  const [mentorId, setMentorIdState] = useState<MentorId>(DEFAULT_MENTOR_ID);
+  const [mentorId, setMentorIdState] = useState<MentorId>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("edu_mentor_selected_mentor") as MentorId | null;
+      if (stored) return stored;
+    }
+    return DEFAULT_MENTOR_ID;
+  });
   const [language, setLanguageState] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("edu_mentor_language") || "en";
@@ -70,9 +76,18 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     };
     window.addEventListener("edu_mentor_language_changed", handler);
     window.addEventListener("storage", handler);
+
+    const mentorHandler = (e: Event) => {
+      const detail = (e as CustomEvent<{ mentorId?: MentorId }>).detail;
+      const next = detail?.mentorId || (localStorage.getItem("edu_mentor_selected_mentor") as MentorId) || "mira";
+      setMentorId(next);
+    };
+    window.addEventListener("edu_mentor_mentor_changed", mentorHandler);
+
     return () => {
       window.removeEventListener("edu_mentor_language_changed", handler);
       window.removeEventListener("storage", handler);
+      window.removeEventListener("edu_mentor_mentor_changed", mentorHandler);
     };
   }, []);
 

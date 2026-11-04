@@ -34,6 +34,37 @@ body {
   border-radius: 24px;
 }
 
+html.dark {
+  --background: #090d16;
+  --foreground: #f1f5f9;
+  --primary: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --user-bubble: #7c3aed;
+  --assistant-bubble: #172033;
+  --border: #1e293b;
+  --panel: rgba(15, 23, 42, 0.78);
+  color-scheme: dark;
+}
+
+html.dark body {
+  background:
+    radial-gradient(920px 480px at 8% -8%, rgb(109 40 217 / 0.22), transparent 58%),
+    radial-gradient(780px 420px at 100% 0%, rgb(79 70 229 / 0.18), transparent 54%),
+    radial-gradient(640px 360px at 70% 110%, rgb(30 58 138 / 0.25), transparent 55%),
+    linear-gradient(180deg, #090d16 0%, #0d1322 100%);
+  color: var(--foreground);
+}
+
+html.dark .glass-bar,
+html.dark .glass-panel {
+  background: rgba(17, 24, 39, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 18px 40px -28px rgb(0 0 0 / 0.7),
+    0 1px 0 rgb(255 255 255 / 0.05) inset;
+}
+
+
 .glass-panel {
   border-radius: 28px;
 }

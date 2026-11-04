@@ -98,7 +98,9 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[Edu Mentor] [warn] Database init: {exc}", flush=True)
 
-    _preload_models()
+    import os
+    if not os.environ.get("TESTING") and not os.environ.get("PYTEST_CURRENT_TEST"):
+        _preload_models()
     yield
 
 

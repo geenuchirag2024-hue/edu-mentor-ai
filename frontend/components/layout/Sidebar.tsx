@@ -1,241 +1,302 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthUser, getCurrentUser } from "@/services/authService";
-
-const BASE_LINKS = [
-  { href: "/chat", label: "Tutor", icon: TutorIcon },
-  { href: "/quiz", label: "Quiz", icon: QuizIcon },
-  { href: "/interview", label: "Interview", icon: InterviewIcon },
-  { href: "/notes", label: "Notes", icon: NotesIcon },
-  { href: "/progress", label: "Progress", icon: ProgressIcon },
-];
+import { MENTOR_PROFILES } from "@/services/mentors";
+import type { MentorId } from "@/types/mentor";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [panel, setPanel] = useState<"settings" | "help" | null>(null);
+  const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [selectedMentor, setSelectedMentor] = useState<MentorId>("mira");
+  const [mentorsExpanded, setMentorsExpanded] = useState(true);
 
   useEffect(() => {
     setUser(getCurrentUser());
     const handleAuth = () => setUser(getCurrentUser());
     window.addEventListener("edu_mentor_auth_changed", handleAuth);
-    return () => window.removeEventListener("edu_mentor_auth_changed", handleAuth);
+
+    // Initial mentor from localStorage
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("edu_mentor_selected_mentor") as MentorId | null;
+      if (stored) setSelectedMentor(stored);
+    }
+
+    const handleMentorChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ mentorId?: MentorId }>).detail;
+      const next = detail?.mentorId || (localStorage.getItem("edu_mentor_selected_mentor") as MentorId) || "mira";
+      setSelectedMentor(next);
+    };
+
+    window.addEventListener("edu_mentor_mentor_changed", handleMentorChange);
+    return () => {
+      window.removeEventListener("edu_mentor_auth_changed", handleAuth);
+      window.removeEventListener("edu_mentor_mentor_changed", handleMentorChange);
+    };
   }, []);
 
-  // Close panel on Escape key
-  useEffect(() => {
-    if (!panel) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPanel(null);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [panel]);
+  const handleSelectMentor = (id: MentorId) => {
+    setSelectedMentor(id);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("edu_mentor_selected_mentor", id);
+      window.dispatchEvent(
+        new CustomEvent("edu_mentor_mentor_changed", { detail: { mentorId: id } })
+      );
+    }
+    // If not currently on /chat, navigate to /chat
+    if (pathname !== "/chat" && !pathname.startsWith("/chat/")) {
+      router.push("/chat");
+    }
+  };
 
   const isTeacher = user?.role === "teacher";
-  const links = isTeacher
-    ? [{ href: "/teacher", label: "Teacher", icon: TeacherIcon }, ...BASE_LINKS]
-    : BASE_LINKS;
 
   return (
-    <>
-      <aside className="glass-bar relative z-20 flex h-full w-[4.75rem] shrink-0 flex-col py-3 xl:w-52">
-        <nav className="flex flex-1 flex-col gap-1 px-2" aria-label="Main">
-          {links.map((link) => {
-            const active =
-              pathname === link.href || pathname.startsWith(`${link.href}/`);
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                title={link.label}
-                className={`flex items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition xl:justify-start ${
-                  active
-                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-600/25"
-                    : "text-slate-500 hover:bg-white/80 hover:text-slate-800"
-                }`}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className="hidden xl:inline">{link.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+    <aside className="glass-bar dark:bg-slate-900/80 dark:border-slate-800 relative z-20 flex h-full w-[4.75rem] shrink-0 flex-col py-3 transition-colors xl:w-60">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2" aria-label="Main">
+        {isTeacher ? (
+          // ================= TEACHER NAVIGATION =================
+          <>
+            <SidebarLink
+              href="/teacher"
+              label="Dashboard"
+              active={pathname === "/teacher"}
+              icon={DashboardIcon}
+            />
+            <SidebarLink
+              href="/teacher/attendance"
+              label="Attendance"
+              active={pathname.startsWith("/teacher/attendance")}
+              icon={AttendanceIcon}
+            />
+            <SidebarLink
+              href="/teacher/leave-letters"
+              label="Leave Letters"
+              active={pathname.startsWith("/teacher/leave-letters")}
+              icon={LeaveLetterIcon}
+            />
+            <SidebarLink
+              href="/teacher/notes"
+              label="Notes & Materials"
+              active={pathname.startsWith("/teacher/notes")}
+              icon={NotesIcon}
+            />
+            <SidebarLink
+              href="/teacher/students"
+              label="Student Management"
+              active={pathname.startsWith("/teacher/students")}
+              icon={StudentsIcon}
+            />
+          </>
+        ) : (
+          // ================= STUDENT NAVIGATION =================
+          <>
+            <SidebarLink
+              href="/chat"
+              label="Tutor"
+              active={pathname === "/chat" || pathname.startsWith("/chat/")}
+              icon={TutorIcon}
+            />
 
-        <div className="mx-2 border-t border-slate-200/80 pt-2">
-          <button
-            type="button"
-            onClick={() => setPanel(panel === "settings" ? null : "settings")}
-            className={`flex w-full items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition xl:justify-start ${
-              panel === "settings"
-                ? "bg-white text-slate-800"
-                : "text-slate-500 hover:bg-white hover:text-slate-800"
-            }`}
-          >
-            <SettingsIcon className="h-5 w-5 shrink-0" />
-            <span className="hidden xl:inline">Settings</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setPanel(panel === "help" ? null : "help")}
-            className={`flex w-full items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition xl:justify-start ${
-              panel === "help"
-                ? "bg-white text-slate-800"
-                : "text-slate-500 hover:bg-white hover:text-slate-800"
-            }`}
-          >
-            <HelpIcon className="h-5 w-5 shrink-0" />
-            <span className="hidden xl:inline">Help</span>
-          </button>
-        </div>
-
-        <div className="mx-2 mt-3 hidden rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 p-3.5 text-white shadow-lg shadow-violet-500/25 xl:block">
-          <p className="text-sm font-semibold leading-snug">
-            {isTeacher ? "Empower your students! 📚" : "Keep Learning, Keep Growing! 🚀"}
-          </p>
-          <div className="mt-3 flex gap-1.5">
-            <span className="h-1.5 w-4 rounded-full bg-white" />
-            <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
-            <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
-          </div>
-        </div>
-      </aside>
-
-      {/* Global High-Z Modal Overlay for Settings and Help */}
-      {panel && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setPanel(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="w-full max-w-lg rounded-3xl border border-white/80 bg-white p-6 shadow-2xl shadow-slate-900/30 transition-all sm:p-7"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-                  {panel === "settings" ? (
-                    <SettingsIcon className="h-5 w-5" />
-                  ) : (
-                    <HelpIcon className="h-5 w-5" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {panel === "settings" ? "Application Settings" : "Edu Mentor AI Guide & Help"}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {panel === "settings"
-                      ? "Customize your audio, avatar, and learning workspace"
-                      : "Quick tips for an optimal conversational learning experience"}
-                  </p>
-                </div>
-              </div>
+            {/* Expandable Mentors Section */}
+            <div className="flex flex-col">
               <button
                 type="button"
-                onClick={() => setPanel(null)}
-                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-                aria-label="Close modal"
+                onClick={() => setMentorsExpanded(!mentorsExpanded)}
+                className={`group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${
+                  pathname === "/chat"
+                    ? "text-violet-600 dark:text-violet-400 bg-violet-50/80 dark:bg-violet-950/40"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
+                }`}
+                title="Mentors"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="mt-4 max-h-[70vh] overflow-y-auto pr-1">
-              {panel === "settings" ? (
-                <div className="space-y-4 text-xs">
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
-                    <h4 className="font-semibold text-slate-800">Account & Permissions</h4>
-                    <p className="mt-0.5 text-slate-500">
-                      Logged in as <strong className="text-slate-700">{user?.full_name || "Guest"}</strong> ({user?.email || "N/A"})
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-bold text-violet-800 uppercase">
-                        {user?.role || "student"}
-                      </span>
-                      {isTeacher && (
-                        <span className="text-[11px] text-indigo-600 font-medium">
-                          ✓ Curriculum upload & student analytics access
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
-                    <h4 className="font-semibold text-slate-800">AI Mentor Voice & Speech</h4>
-                    <ul className="mt-2 space-y-1.5 text-slate-600">
-                      <li>• <strong>Mira</strong>: Warm, friendly foundations (Piper <code>en_US-lessac-medium</code>).</li>
-                      <li>• <strong>Arjun</strong>: Calm, practical DBMS architect (Piper <code>en_US-ryan-medium</code> or adaptive fallback).</li>
-                      <li>• <strong>Tara</strong>: Analytical Deep Learning tutor (Piper <code>en_US-amy-medium</code> or adaptive fallback).</li>
-                      <li>• <strong>Kiran</strong>: Energetic code practitioner (Piper <code>en_US-danny-low</code> or adaptive fallback).</li>
-                    </ul>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
-                    <h4 className="font-semibold text-slate-800">Avatar Motion & Lip Sync</h4>
-                    <p className="mt-1 text-slate-600 leading-relaxed">
-                      Edu-Mentor AI automatically synchronizes facial gestures, eye blinks, and jaw motion with active Piper audio playback. Mouth animation remains stationary during speech pauses and silence.
-                    </p>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <MentorsIcon className="h-5 w-5 shrink-0" />
+                  <span className="hidden xl:inline">Mentors</span>
                 </div>
-              ) : (
-                <div className="space-y-4 text-xs text-slate-600">
-                  <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-3.5">
-                    <h4 className="font-bold text-violet-900">Conversational Voice Interaction</h4>
-                    <p className="mt-1 text-violet-800 leading-relaxed">
-                      Tap the microphone button once to start speaking. When you finish your thought, tap it again to submit your question. The system transcribes your speech via faster-whisper, retrieves subject documents via RAG, and generates the mentor&apos;s answer with voice synthesis.
-                    </p>
-                  </div>
+                <span className="hidden xl:inline text-xs text-slate-400 dark:text-slate-500 transition-transform duration-200">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className={`transform transition-transform ${mentorsExpanded ? "rotate-180" : ""}`}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </span>
+              </button>
 
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
-                    <h4 className="font-semibold text-slate-800">Switching Mentors & Subjects</h4>
-                    <p className="mt-1 leading-relaxed">
-                      Use the top pill selector in Tutor chat to switch between Mira, Arjun, Tara, and Kiran. Each mentor brings a distinct teaching philosophy and persona. You can also toggle between Machine Learning, DBMS, and Deep Learning at any time.
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5">
-                    <h4 className="font-semibold text-slate-800">Tutor Modes & Hints</h4>
-                    <p className="mt-1 leading-relaxed">
-                      Switch between <em>Standard</em>, <em>Socratic</em> (asks guiding questions), <em>Code Explainer</em>, and <em>Exam Prep</em> modes using the mode toggle next to the subject pills.
-                    </p>
-                  </div>
+              {/* Mentors Submenu */}
+              {mentorsExpanded && (
+                <div className="mt-1 flex flex-col gap-1 pl-1 xl:pl-3">
+                  {MENTOR_PROFILES.map((m) => {
+                    const isSelected = m.id === selectedMentor;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => handleSelectMentor(m.id)}
+                        title={`${m.name} (${m.specialty})`}
+                        className={`group relative flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-xs font-medium transition ${
+                          isSelected
+                            ? "bg-violet-600 text-white shadow-sm font-semibold"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-white/90 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+                        }`}
+                      >
+                        <span className="relative flex h-6 w-6 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-300 dark:ring-slate-700">
+                          <img
+                            src={m.avatar}
+                            alt={m.name}
+                            className="h-full w-full object-cover"
+                          />
+                        </span>
+                        <div className="hidden min-w-0 flex-1 xl:block">
+                          <p className="truncate leading-tight">{m.name.replace("Mentor ", "")}</p>
+                          <p className={`truncate text-[10px] ${isSelected ? "text-violet-100" : "text-slate-400 dark:text-slate-400"}`}>
+                            {m.specialty}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-white xl:mr-1 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            <div className="mt-5 flex justify-end border-t border-slate-100 pt-3">
-              <button
-                type="button"
-                onClick={() => setPanel(null)}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+            <SidebarLink
+              href="/quiz"
+              label="Quiz"
+              active={pathname === "/quiz" || pathname.startsWith("/quiz/")}
+              icon={QuizIcon}
+            />
+            <SidebarLink
+              href="/interview"
+              label="Interview"
+              active={pathname === "/interview" || pathname.startsWith("/interview/")}
+              icon={InterviewIcon}
+            />
+            <SidebarLink
+              href="/notes"
+              label="Notes"
+              active={pathname === "/notes" || pathname.startsWith("/notes/")}
+              icon={NotesIcon}
+            />
+            <SidebarLink
+              href="/progress"
+              label="Progress"
+              active={pathname === "/progress" || pathname.startsWith("/progress/")}
+              icon={ProgressIcon}
+            />
+          </>
+        )}
+
+        {/* Settings Navigation Item (Shared for both Student & Teacher) */}
+        <div className="mt-2 border-t border-slate-200/80 dark:border-slate-800 pt-2">
+          <SidebarLink
+            href="/settings"
+            label="Settings"
+            active={pathname === "/settings" || pathname.startsWith("/settings/")}
+            icon={SettingsIcon}
+          />
         </div>
-      )}
-    </>
+      </nav>
+
+      {/* Motivational Bottom Card (Desktop only) */}
+      <div className="mx-2 mt-3 hidden rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 p-3.5 text-white shadow-lg shadow-violet-500/25 xl:block">
+        <p className="text-xs font-semibold leading-snug">
+          {isTeacher ? "Empower your students! 📚" : "Keep Learning, Keep Growing! 🚀"}
+        </p>
+        <div className="mt-2 flex gap-1.5">
+          <span className="h-1.5 w-4 rounded-full bg-white" />
+          <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+          <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+        </div>
+      </div>
+    </aside>
   );
 }
 
-function TeacherIcon({ className }: { className?: string }) {
+function SidebarLink({
+  href,
+  label,
+  active,
+  icon: Icon,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <Link
+      href={href}
+      title={label}
+      className={`flex items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition xl:justify-start ${
+        active
+          ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-600/25"
+          : "text-slate-600 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
+      }`}
+    >
+      <Icon className="h-5 w-5 shrink-0" />
+      <span className="hidden xl:inline">{label}</span>
+    </Link>
+  );
+}
+
+// ---------------- Icons ----------------
+
+function DashboardIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5z" />
-      <path d="M6 6h10M6 10h10M6 14h6" />
+      <rect x="3" y="3" width="7" height="9" rx="1" />
+      <rect x="14" y="3" width="7" height="5" rx="1" />
+      <rect x="14" y="12" width="7" height="9" rx="1" />
+      <rect x="3" y="16" width="7" height="5" rx="1" />
     </svg>
   );
 }
+
+function AttendanceIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <path d="m9 16 2 2 4-4" />
+    </svg>
+  );
+}
+
+function LeaveLetterIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+      <polyline points="22,6 12,13 2,6" />
+    </svg>
+  );
+}
+
+function StudentsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
 function TutorIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -244,6 +305,17 @@ function TutorIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+function MentorsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <polyline points="16 11 18 13 22 9" />
+    </svg>
+  );
+}
+
 function QuizIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -253,6 +325,7 @@ function QuizIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
 function InterviewIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -261,6 +334,7 @@ function InterviewIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
 function NotesIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -269,6 +343,7 @@ function NotesIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
 function ProgressIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -276,20 +351,12 @@ function ProgressIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
 function SettingsIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.7.9 1.2 1.6 1.3H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
-    </svg>
-  );
-}
-function HelpIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.1 9a3 3 0 1 1 4.4 2.7c-.9.5-1.5 1.1-1.5 2" />
-      <path d="M12 17h.01" />
     </svg>
   );
 }

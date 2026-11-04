@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import os
 from pathlib import Path
 
@@ -9,11 +10,19 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.deps import require_teacher
+from backend.api.deps import get_current_user, require_teacher
 from backend.api.schemas.auth import UserOut
+from backend.api.schemas.teacher import (
+    AttendanceRecordOut,
+    AttendanceSummary,
+    LeaveLetterOut,
+    MarkAttendanceRequest,
+    ReviewLeaveLetterRequest,
+    SubmitLeaveLetterRequest,
+)
 from backend.config import PROJECT_ROOT
 from backend.db.database import get_db
-from backend.db.models import User
+from backend.db.models import AttendanceRecord, LeaveLetter, User
 
 router = APIRouter(prefix="/api/teacher", tags=["teacher"])
 
@@ -240,4 +249,276 @@ async def upload_content(
         "uploaded_by": current_teacher.email,
         "message": f"Successfully indexed {indexed_count} chunks for '{safe_filename}' under {clean_subj}.",
     }
+
+
+# =========================================================================
+# Attendance Management
+# =========================================================================
+
+
+@router.get("/attendance", response_model=AttendanceSummary)
+async def get_attendance(
+    date: str,
+    subject: str = "Machine Learning",
+    current_teacher: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve attendance roster for a specific date and subject."""
+    students_query = select(User).where(User.role == "student").order_by(User.full_name)
+    students_res = await db.execute(students_query)
+    students = students_res.scalars().all()
+
+    att_query = select(AttendanceRecord).where(
+        AttendanceRecord.date == date,
+        AttendanceRecord.subject == subject,
+    )
+    att_res = await db.execute(att_query)
+    existing_records = {rec.student_id: rec for rec in att_res.scalars().all()}
+
+    records_out: list[AttendanceRecordOut] = []
+    present_cnt = 0
+    absent_cnt = 0
+    late_cnt = 0
+
+    for s in students:
+        rec = existing_records.get(s.id)
+        if rec:
+            status_val = rec.status
+            rec_id = rec.id
+            remarks_val = rec.remarks
+            updated_at = rec.updated_at
+        else:
+            status_val = "present"
+            rec_id = 0
+            remarks_val = None
+            updated_at = None
+
+        if status_val == "present":
+            present_cnt += 1
+        elif status_val == "late":
+            late_cnt += 1
+        elif status_val == "absent":
+            absent_cnt += 1
+
+        records_out.append(
+            AttendanceRecordOut(
+                id=rec_id,
+                student_id=s.id,
+                student_name=s.full_name,
+                student_email=s.email,
+                date=date,
+                subject=subject,
+                status=status_val,
+                remarks=remarks_val,
+                updated_at=updated_at,
+            )
+        )
+
+    total_enrolled = len(students)
+    rate = round((present_cnt + (late_cnt * 0.5)) / total_enrolled * 100, 1) if total_enrolled > 0 else 0.0
+
+    return AttendanceSummary(
+        date=date,
+        subject=subject,
+        total_enrolled=total_enrolled,
+        total_marked=len(existing_records),
+        present_count=present_cnt,
+        absent_count=absent_cnt,
+        late_count=late_cnt,
+        attendance_rate=rate,
+        records=records_out,
+    )
+
+
+@router.post("/attendance", response_model=AttendanceSummary)
+async def mark_attendance(
+    req: MarkAttendanceRequest,
+    current_teacher: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save or update attendance records for students on a given date."""
+    for item in req.records:
+        stmt = select(AttendanceRecord).where(
+            AttendanceRecord.student_id == item.student_id,
+            AttendanceRecord.date == req.date,
+            AttendanceRecord.subject == req.subject,
+        )
+        res = await db.execute(stmt)
+        record = res.scalar_one_or_none()
+        if record:
+            record.status = item.status
+            record.remarks = item.remarks
+            record.teacher_id = current_teacher.id
+        else:
+            new_record = AttendanceRecord(
+                student_id=item.student_id,
+                teacher_id=current_teacher.id,
+                date=req.date,
+                subject=req.subject,
+                status=item.status,
+                remarks=item.remarks,
+            )
+            db.add(new_record)
+
+    await db.commit()
+    return await get_attendance(date=req.date, subject=req.subject, current_teacher=current_teacher, db=db)
+
+
+# =========================================================================
+# Leave Letters Workflow
+# =========================================================================
+
+
+@router.get("/leave-letters", response_model=list[LeaveLetterOut])
+async def list_leave_letters(
+    status: str | None = None,
+    current_teacher: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """List student leave letters with optional status filtering."""
+    query = select(LeaveLetter).order_by(LeaveLetter.created_at.desc())
+    if status and status in ("pending", "approved", "rejected"):
+        query = query.where(LeaveLetter.status == status)
+    res = await db.execute(query)
+    letters = res.scalars().all()
+
+    out: list[LeaveLetterOut] = []
+    for l in letters:
+        student_res = await db.execute(select(User).where(User.id == l.student_id))
+        student = student_res.scalar_one_or_none()
+        reviewer_name = None
+        if l.reviewed_by_id:
+            rev_res = await db.execute(select(User).where(User.id == l.reviewed_by_id))
+            rev = rev_res.scalar_one_or_none()
+            reviewer_name = rev.full_name if rev else None
+
+        out.append(
+            LeaveLetterOut(
+                id=l.id,
+                student_id=l.student_id,
+                student_name=student.full_name if student else "Unknown Student",
+                student_email=student.email if student else "",
+                subject=l.subject,
+                reason=l.reason,
+                start_date=l.start_date,
+                end_date=l.end_date,
+                status=l.status,
+                teacher_remarks=l.teacher_remarks,
+                reviewed_by_id=l.reviewed_by_id,
+                reviewed_by_name=reviewer_name,
+                reviewed_at=l.reviewed_at,
+                created_at=l.created_at,
+            )
+        )
+    return out
+
+
+@router.post("/leave-letters/{leave_id}/review", response_model=LeaveLetterOut)
+async def review_leave_letter(
+    leave_id: int,
+    req: ReviewLeaveLetterRequest,
+    current_teacher: User = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """Teacher review (approval or rejection) of student leave request."""
+    stmt = select(LeaveLetter).where(LeaveLetter.id == leave_id)
+    res = await db.execute(stmt)
+    letter = res.scalar_one_or_none()
+    if not letter:
+        raise HTTPException(status_code=404, detail="Leave letter not found")
+
+    letter.status = req.status
+    letter.teacher_remarks = req.teacher_remarks
+    letter.reviewed_by_id = current_teacher.id
+    letter.reviewed_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(letter)
+
+    student_res = await db.execute(select(User).where(User.id == letter.student_id))
+    student = student_res.scalar_one_or_none()
+
+    return LeaveLetterOut(
+        id=letter.id,
+        student_id=letter.student_id,
+        student_name=student.full_name if student else "Unknown Student",
+        student_email=student.email if student else "",
+        subject=letter.subject,
+        reason=letter.reason,
+        start_date=letter.start_date,
+        end_date=letter.end_date,
+        status=letter.status,
+        teacher_remarks=letter.teacher_remarks,
+        reviewed_by_id=letter.reviewed_by_id,
+        reviewed_by_name=current_teacher.full_name,
+        reviewed_at=letter.reviewed_at,
+        created_at=letter.created_at,
+    )
+
+
+@router.post("/leave-letters/submit", response_model=LeaveLetterOut)
+async def submit_leave_letter(
+    req: SubmitLeaveLetterRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Student submission of a leave letter request."""
+    letter = LeaveLetter(
+        student_id=current_user.id,
+        subject=req.subject,
+        reason=req.reason,
+        start_date=req.start_date,
+        end_date=req.end_date,
+        status="pending",
+    )
+    db.add(letter)
+    await db.commit()
+    await db.refresh(letter)
+
+    return LeaveLetterOut(
+        id=letter.id,
+        student_id=letter.student_id,
+        student_name=current_user.full_name,
+        student_email=current_user.email,
+        subject=letter.subject,
+        reason=letter.reason,
+        start_date=letter.start_date,
+        end_date=letter.end_date,
+        status=letter.status,
+        teacher_remarks=None,
+        reviewed_by_id=None,
+        reviewed_by_name=None,
+        reviewed_at=None,
+        created_at=letter.created_at,
+    )
+
+
+@router.get("/leave-letters/my", response_model=list[LeaveLetterOut])
+async def list_my_leave_letters(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve leave letters submitted by the currently logged-in student."""
+    query = select(LeaveLetter).where(LeaveLetter.student_id == current_user.id).order_by(LeaveLetter.created_at.desc())
+    res = await db.execute(query)
+    letters = res.scalars().all()
+    return [
+        LeaveLetterOut(
+            id=l.id,
+            student_id=l.student_id,
+            student_name=current_user.full_name,
+            student_email=current_user.email,
+            subject=l.subject,
+            reason=l.reason,
+            start_date=l.start_date,
+            end_date=l.end_date,
+            status=l.status,
+            teacher_remarks=l.teacher_remarks,
+            reviewed_by_id=l.reviewed_by_id,
+            reviewed_by_name=None,
+            reviewed_at=l.reviewed_at,
+            created_at=l.created_at,
+        )
+        for l in letters
+    ]
+
 
