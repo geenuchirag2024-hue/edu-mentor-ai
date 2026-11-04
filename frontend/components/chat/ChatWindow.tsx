@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import MessageBubble, { type SpeechReveal } from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
-import type { ChatMessage } from "@/types/chat";
+import type { ChatMessage, RelatedVideo } from "@/types/chat";
 import type { TutorMode } from "@/types/tutor";
 
 interface ChatWindowProps {
@@ -12,6 +12,7 @@ interface ChatWindowProps {
   statusMessage?: string | null;
   tutorMode?: TutorMode;
   onSpeak?: (text: string, messageId: string) => void;
+  onWatchVideo?: (video: RelatedVideo) => void;
   speech?: SpeechReveal;
 }
 
@@ -40,6 +41,7 @@ export default function ChatWindow({
   statusMessage,
   tutorMode = "teacher",
   onSpeak,
+  onWatchVideo,
   speech,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -71,6 +73,7 @@ export default function ChatWindow({
             key={msg.id}
             message={msg}
             onSpeak={onSpeak}
+            onWatchVideo={onWatchVideo}
             speech={speech}
           />
         ))}

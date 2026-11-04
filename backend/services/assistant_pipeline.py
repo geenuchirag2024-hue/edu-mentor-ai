@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
+
+logger = logging.getLogger(__name__)
 
 from backend.models.llm import get_llm
 from backend.rag.retriever import retrieve_context
@@ -134,12 +137,21 @@ def process_text_query(
         user_message=message,
         hint_level=hint_level,
     )
+
+    related_video = None
+    try:
+        from backend.video_matcher import find_related_video
+        related_video = find_related_video(message, subject=subject)
+    except Exception as exc:
+        logger.warning("Video matching failed in assistant pipeline: %s", exc)
+
     return {
         "answer": answer,
         "session_id": sid,
         "sources": sources,
         "mentor_id": mentor_id or "mira",
         "language": effective_lang,
+        "related_video": related_video,
         **cues,
     }
 
@@ -227,4 +239,5 @@ def process_voice_query(
         "mentor_id": mentor_id or "mira",
         "language": effective_lang,
         "tts_supported": tts_supported,
+        "related_video": result.get("related_video"),
     }

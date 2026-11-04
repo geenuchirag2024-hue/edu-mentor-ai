@@ -1,5 +1,5 @@
 import { apiFetch, apiRequest, friendlyApiError } from "./api";
-import type { ChatRequest, ChatResponse } from "@/types/chat";
+import type { ChatRequest, ChatResponse, RelatedVideo } from "@/types/chat";
 
 export async function sendChatMessage(
   request: ChatRequest
@@ -21,6 +21,7 @@ export interface StreamChatCallbacks {
     response_type?: string;
     mentor_id?: string;
     language?: string;
+    related_video?: RelatedVideo | null;
   }) => void;
 }
 
@@ -84,6 +85,7 @@ export async function streamChatMessage(
         response_type?: string;
         mentor_id?: string;
         language?: string;
+        related_video?: RelatedVideo | null;
       };
       if (data.token) callbacks.onToken(data.token);
       if (data.done && data.session_id) {
@@ -95,6 +97,7 @@ export async function streamChatMessage(
           response_type: data.response_type,
           mentor_id: data.mentor_id,
           language: data.language,
+          related_video: data.related_video,
         });
       }
     }
@@ -112,6 +115,7 @@ export async function streamChatMessage(
         response_type?: string;
         mentor_id?: string;
         language?: string;
+        related_video?: RelatedVideo | null;
       };
       if (data.token) callbacks.onToken(data.token);
       if (data.done && data.session_id) {
@@ -123,6 +127,7 @@ export async function streamChatMessage(
           response_type: data.response_type,
           mentor_id: data.mentor_id,
           language: data.language,
+          related_video: data.related_video,
         });
       }
     } catch {

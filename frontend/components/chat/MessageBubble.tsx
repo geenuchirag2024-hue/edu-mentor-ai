@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import type { ChatMessage } from "@/types/chat";
+import type { ChatMessage, RelatedVideo } from "@/types/chat";
 import { revealSpokenText } from "./speechReveal";
 
 export interface SpeechReveal {
@@ -13,12 +13,14 @@ export interface SpeechReveal {
 interface MessageBubbleProps {
   message: ChatMessage;
   onSpeak?: (text: string, messageId: string) => void;
+  onWatchVideo?: (video: RelatedVideo) => void;
   speech?: SpeechReveal;
 }
 
 export default function MessageBubble({
   message,
   onSpeak,
+  onWatchVideo,
   speech,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
@@ -94,6 +96,31 @@ export default function MessageBubble({
               Sources: {message.sources.join(", ")}
             </p>
           )}
+
+          {/* Related Video Recommendation badge */}
+          {!isUser && message.related_video && (
+            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center">
+              <button
+                type="button"
+                onClick={() => onWatchVideo?.(message.related_video!)}
+                className="group flex items-center gap-2 rounded-xl bg-violet-50/90 hover:bg-violet-100/90 border border-violet-200/80 px-3 py-1.5 text-xs font-semibold text-violet-700 transition shadow-xs hover:shadow-sm"
+                title={`Watch related video: ${message.related_video.title}`}
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-white shadow-xs group-hover:scale-105 transition-transform">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
+                <span>Watch Video: {message.related_video.topic || message.related_video.title}</span>
+                {message.related_video.duration_seconds && (
+                  <span className="text-[10px] opacity-75 font-normal">
+                    ({Math.round(message.related_video.duration_seconds)}s)
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
           {isUser && (
             <time className="mt-2 block text-[11px] text-white/70">{time}</time>
           )}

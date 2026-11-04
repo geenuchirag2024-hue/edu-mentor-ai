@@ -55,6 +55,7 @@ async def chat(
         response_type=result.get("response_type", "explanation"),
         mentor_id=result.get("mentor_id", request.mentor_id),
         language=result.get("language", request.language),
+        related_video=result.get("related_video"),
     )
 
 
@@ -100,10 +101,24 @@ async def chat_stream(
                     user_message=request.message,
                     hint_level=request.hint_level,
                 )
+                related_video = None
+                try:
+                    from backend.video_matcher import find_related_video
+                    related_video = find_related_video(request.message, subject=request.subject)
+                except Exception:
+                    related_video = None
+
                 event_queue.put(
                     (
                         "done",
-                        {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id, "language": effective_lang, **cues},
+                        {
+                            "session_id": sid,
+                            "sources": sources,
+                            "mentor_id": request.mentor_id,
+                            "language": effective_lang,
+                            "related_video": related_video,
+                            **cues,
+                        },
                     )
                 )
             except Exception as exc:

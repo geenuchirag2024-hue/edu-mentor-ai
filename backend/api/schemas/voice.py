@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from backend.api.schemas.chat import RelatedVideoInfo
+
 
 class TranscribeResponse(BaseModel):
     text: str
@@ -22,6 +24,7 @@ class SynthesizeResponse(BaseModel):
     mentor_id: str = "mira"
     language: str = "en"
     tts_supported: bool = True
+    related_video: RelatedVideoInfo | None = None
     status: str = "success"
 
 
@@ -37,3 +40,4 @@ class VoiceQueryResponse(BaseModel):
     mentor_id: str = "mira"
     language: str = "en"
     tts_supported: bool = True
+    related_video: RelatedVideoInfo | None = None

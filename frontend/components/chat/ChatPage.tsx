@@ -12,6 +12,7 @@ import MicButton from "@/components/voice/MicButton";
 import MentorSelector from "@/components/mentor/MentorSelector";
 import { getMentorProfile } from "@/services/mentors";
 import { currentSpokenCaption } from "@/components/chat/speechReveal";
+import RelatedVideoPopup from "@/components/RelatedVideoPopup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export default function ChatPage() {
@@ -175,6 +176,7 @@ export default function ChatPage() {
           statusMessage={assistant.statusMessage}
           tutorMode={assistant.tutorMode}
           onSpeak={replayAnswer}
+          onWatchVideo={assistant.openVideo}
           speech={{
             messageId: assistant.speakingMessageId,
             ratio: speakRatio,
@@ -257,6 +259,17 @@ export default function ChatPage() {
           }
         />
       </aside>
+
+      <RelatedVideoPopup
+        video={assistant.activeRelatedVideo}
+        isOpen={assistant.isVideoPopupOpen}
+        onClose={assistant.closeVideoPopup}
+        onReopen={() => {
+          if (assistant.activeRelatedVideo) {
+            assistant.openVideo(assistant.activeRelatedVideo);
+          }
+        }}
+      />
 
       <AudioPlayer
         ref={audioPlayerRef}

@@ -27,6 +27,7 @@ from backend.api.routes import (
     chat,
     documents,
     health,
+    media,
     mentors,
     notifications,
     resources,
@@ -128,6 +129,7 @@ app.include_router(documents.router)
 app.include_router(resources.router)
 app.include_router(notifications.router)
 app.include_router(analytics.router)
+app.include_router(media.router)
 
 
 @app.get("/")

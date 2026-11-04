@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { streamChatMessage } from "@/services/chatService";
 import { sendVoiceQuery, synthesizeSpeech } from "@/services/voiceService";
 import { getLearnerId } from "@/services/learner";
-import type { ChatMessage } from "@/types/chat";
+import type { ChatMessage, RelatedVideo } from "@/types/chat";
 import type { TutorMode } from "@/types/tutor";
 import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
 
@@ -57,6 +57,8 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
   languageRef.current = language;
   const abortRef = useRef<AbortController | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [activeRelatedVideo, setActiveRelatedVideo] = useState<RelatedVideo | null>(null);
+  const [isVideoPopupOpen, setIsVideoPopupOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -258,9 +260,15 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
             onComplete: (meta) => {
               setSessionId(meta.session_id);
               sources = meta.sources;
+              if (meta.related_video) {
+                setActiveRelatedVideo(meta.related_video);
+                setIsVideoPopupOpen(true);
+              }
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantId ? { ...m, sources: meta.sources } : m
+                  m.id === assistantId
+                    ? { ...m, sources: meta.sources, related_video: meta.related_video }
+                    : m
                 )
               );
               optionsRef.current.onCues?.(
@@ -374,6 +382,11 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
         );
         setSessionId(res.session_id);
 
+        if (res.related_video) {
+          setActiveRelatedVideo(res.related_video);
+          setIsVideoPopupOpen(true);
+        }
+
         const assistantId = makeId();
         setMessages((prev) => {
           const rest = prev.filter((m) => m.id !== placeholderId);
@@ -392,6 +405,7 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
               content: res.answer,
               timestamp: new Date(),
               sources: res.sources,
+              related_video: res.related_video,
             },
           ];
         });
@@ -422,6 +436,15 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     [sessionId, setMascot]
   );
 
+  const openVideo = useCallback((video: RelatedVideo) => {
+    setActiveRelatedVideo(video);
+    setIsVideoPopupOpen(true);
+  }, []);
+
+  const closeVideoPopup = useCallback(() => {
+    setIsVideoPopupOpen(false);
+  }, []);
+
   return {
     messages,
     sessionId,
@@ -440,6 +463,10 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
     setMentorId,
     language,
     setLanguage,
+    activeRelatedVideo,
+    isVideoPopupOpen,
+    openVideo,
+    closeVideoPopup,
     sendText,
     sendVoice,
     startListening,

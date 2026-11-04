@@ -30,43 +30,31 @@ app.dependency_overrides[get_db] = override_get_db
 
 
 @pytest.fixture(autouse=True)
-def setup_test_db():
+async def setup_test_db():
     """Reset schema before every test and seed student and teacher users."""
-    async def _init():
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
 
-        async with TestSessionLocal() as session:
-            student = User(
-                id=1,
-                full_name="Default Student",
-                email="student.default@example.com",
-                password_hash=hash_password("StudentPassword123"),
-                role="student",
-            )
-            teacher = User(
-                id=2,
-                full_name="Professor Smith",
-                email="teacher.smith@example.com",
-                password_hash=hash_password("TeacherPassword123"),
-                role="teacher",
-            )
-            session.add_all([student, teacher])
-            await session.commit()
-
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop and loop.is_running():
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            pool.submit(asyncio.run, _init()).result()
-    else:
-        asyncio.run(_init())
+    async with TestSessionLocal() as session:
+        student = User(
+            id=1,
+            full_name="Default Student",
+            email="student.default@example.com",
+            password_hash=hash_password("StudentPassword123"),
+            role="student",
+        )
+        teacher = User(
+            id=2,
+            full_name="Professor Smith",
+            email="teacher.smith@example.com",
+            password_hash=hash_password("TeacherPassword123"),
+            role="teacher",
+        )
+        session.add_all([student, teacher])
+        await session.commit()
     yield
+
 
 
 @pytest.fixture

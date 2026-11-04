@@ -1,0 +1,86 @@
+[
+  {
+    "id": "supervised-learning",
+    "title": "Understanding Supervised Learning with Mentor Mira",
+    "topic": "Supervised Learning",
+    "subject": "Machine Learning",
+    "keywords": [
+      "supervised learning",
+      "supervised",
+      "labeled data",
+      "labelled data",
+      "training examples",
+      "classification",
+      "regression",
+      "known answers",
+      "predict new data",
+      "cats and dogs",
+      "ground truth"
+    ],
+    "description": "Mentor Mira explains supervised learning using image classification (cats vs. dogs), labeled training examples, and pattern prediction.",
+    "video_filename": "supervised_learning.mp4",
+    "video_url": "/api/media/videos/supervised_learning.mp4",
+    "thumbnail_url": "/api/media/thumbnails/supervised_learning.jpg",
+    "language": "en",
+    "duration_seconds": 47.58,
+    "active": true,
+    "original_filename": "VID-20261008-WA0026_(1).mp4"
+  },
+  {
+    "id": "unsupervised-learning",
+    "title": "Understanding Unsupervised Learning with Mentor Mira",
+    "topic": "Unsupervised Learning",
+    "subject": "Machine Learning",
+    "keywords": [
+      "unsupervised learning",
+      "unsupervised",
+      "unlabeled data",
+      "unlabelled data",
+      "clustering",
+      "clusters",
+      "hidden patterns",
+      "natural groups",
+      "data similarity",
+      "discover structure",
+      "k-means"
+    ],
+    "description": "Mentor Mira explains unsupervised learning, unlabeled data, and discovering natural groups and hidden patterns through clustering.",
+    "video_filename": "unsupervised_learning.mp4",
+    "video_url": "/api/media/videos/unsupervised_learning.mp4",
+    "thumbnail_url": "/api/media/thumbnails/unsupervised_learning.jpg",
+    "language": "en",
+    "duration_seconds": 48.46,
+    "active": true,
+    "original_filename": "VID-20261008-WA0024_(1).mp4"
+  },
+  {
+    "id": "reinforcement-learning",
+    "title": "Understanding Reinforcement Learning with Mentor Mira",
+    "topic": "Reinforcement Learning",
+    "subject": "Machine Learning",
+    "keywords": [
+      "reinforcement learning",
+      "reinforcement",
+      "reward",
+      "rewards",
+      "agent",
+      "environment",
+      "robot maze",
+      "trial and error",
+      "feedback",
+      "penalty",
+      "penalties",
+      "policy",
+      "actions and rewards"
+    ],
+    "description": "Mentor Mira illustrates reinforcement learning with a maze-navigating robot learning optimal actions through trial-and-error rewards and feedback.",
+    "video_filename": "reinforcement_learning.mp4",
+    "video_url": "/api/media/videos/reinforcement_learning.mp4",
+    "thumbnail_url": "/api/media/thumbnails/reinforcement_learning.jpg",
+    "language": "en",
+    "duration_seconds": 48.04,
+    "active": true,
+    "original_filename": "VID-20261008-WA0025_(1).mp4"
+  }
+]
+

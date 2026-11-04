@@ -1,3 +1,5 @@
+import type { RelatedVideo } from "./chat";
+
 export interface VoiceQueryResponse {
   transcript: string;
   answer: string;
@@ -9,6 +11,7 @@ export interface VoiceQueryResponse {
   response_type?: string;
   mentor_id?: string;
   language?: string;
+  related_video?: RelatedVideo | null;
 }
 
 export type MascotState = "idle" | "listening" | "thinking" | "speaking";

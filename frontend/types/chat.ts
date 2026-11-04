@@ -1,5 +1,16 @@
 import type { TutorMode } from "./tutor";
 
+export interface RelatedVideo {
+  id: string;
+  title: string;
+  topic: string;
+  subject: string;
+  description: string;
+  video_url: string;
+  thumbnail_url?: string | null;
+  duration_seconds?: number | null;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -7,6 +18,7 @@ export interface ChatMessage {
   timestamp: Date;
   sources?: string[];
   isVoice?: boolean;
+  related_video?: RelatedVideo | null;
 }
 
 export interface ChatRequest {
@@ -19,6 +31,7 @@ export interface ChatRequest {
   subject?: string;
   mentor_id?: string;
   language?: string;
+  related_video?: RelatedVideo | null;
 }
 
 export interface ChatResponse {
@@ -30,4 +43,5 @@ export interface ChatResponse {
   response_type?: string;
   mentor_id?: string;
   language?: string;
+  related_video?: RelatedVideo | null;
 }

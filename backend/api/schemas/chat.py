@@ -18,6 +18,17 @@ class ChatRequest(BaseModel):
     language: str = "en"
 
 
+class RelatedVideoInfo(BaseModel):
+    id: str
+    title: str
+    topic: str
+    subject: str = "Machine Learning"
+    description: str = ""
+    video_url: str
+    thumbnail_url: str | None = None
+    duration_seconds: float | None = None
+
+
 class ChatResponse(BaseModel):
     answer: str
     session_id: str
@@ -27,3 +38,4 @@ class ChatResponse(BaseModel):
     response_type: str = "explanation"
     mentor_id: str = "mira"
     language: str = "en"
+    related_video: RelatedVideoInfo | None = None
