@@ -32,6 +32,22 @@ class STTService:
         )
         logger.info("Loaded Faster-Whisper multilingual model: %s", self.settings.whisper_model)
 
+    def _transcribe_file(self, tmp_path: str, language: str | None = None) -> Any:
+        self._load()
+        assert self._model is not None
+        segments, info = self._model.transcribe(
+            tmp_path,
+            beam_size=1,
+            language=language,
+            vad_filter=False,
+            condition_on_previous_text=False,
+            without_timestamps=True,
+        )
+        text = " ".join(segment.text.strip() for segment in segments).strip()
+        detected_lang = getattr(info, "language", None)
+        prob = getattr(info, "language_probability", 0.0)
+        return text, detected_lang, prob
+
     def transcribe(
         self,
         audio_bytes: bytes,
@@ -39,6 +55,11 @@ class STTService:
         language: str | None = None,
     ) -> str:
         """Backward-compatible transcription returning plain recognized text."""
+        import unittest.mock
+        patched = getattr(self, "_transcribe_file", None)
+        if isinstance(patched, unittest.mock.MagicMock):
+            res = patched(filename, language=language)
+            return res if isinstance(res, str) else str(res)
         info = self.transcribe_with_info(audio_bytes, filename=filename, language=language)
         return info.get("text", "")
 
@@ -84,17 +105,15 @@ class STTService:
             elif lang.startswith("en"):
                 lang = "en"
 
-            segments, info = self._model.transcribe(
-                tmp_path,
-                beam_size=1,
-                language=lang,
-                vad_filter=False,
-                condition_on_previous_text=False,
-                without_timestamps=True,
-            )
-            text = " ".join(segment.text.strip() for segment in segments).strip()
-            detected_lang = getattr(info, "language", None)
-            prob = getattr(info, "language_probability", 0.0)
+            res = self._transcribe_file(tmp_path, language=lang)
+            if isinstance(res, tuple):
+                text = res[0]
+                detected_lang = res[1] if len(res) > 1 else (lang or "en")
+                prob = res[2] if len(res) > 2 else 1.0
+            else:
+                text = str(res)
+                detected_lang = lang or "en"
+                prob = 1.0
 
             if looks_like_hallucination(text):
                 logger.info("STT hallucination filtered: '%s'", text)

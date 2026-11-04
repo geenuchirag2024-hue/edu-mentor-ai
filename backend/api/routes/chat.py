@@ -70,7 +70,7 @@ async def chat_stream(
 
         def produce() -> None:
             try:
-                sid, token_iter, sources = process_text_stream(
+                sid, token_iter, sources, effective_lang = process_text_stream(
                     request.message,
                     request.session_id,
                     False,
@@ -83,7 +83,7 @@ async def chat_stream(
                     request.language,
                 )
 
-                event_queue.put(("meta", {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id, "language": request.language}))
+                event_queue.put(("meta", {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id, "language": effective_lang}))
                 answer_parts: list[str] = []
                 for token in token_iter:
                     answer_parts.append(token)
@@ -103,7 +103,7 @@ async def chat_stream(
                 event_queue.put(
                     (
                         "done",
-                        {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id, **cues},
+                        {"session_id": sid, "sources": sources, "mentor_id": request.mentor_id, "language": effective_lang, **cues},
                     )
                 )
             except Exception as exc:

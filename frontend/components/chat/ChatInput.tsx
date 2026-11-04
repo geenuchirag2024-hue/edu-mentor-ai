@@ -12,7 +12,7 @@ const CHIPS: { label: string; text?: string; href?: string }[] = [
 ];
 
 interface ChatInputProps {
-  onSendText: (text: string) => void;
+  onSendText: (text: string) => void | Promise<void | boolean>;
   onSendVoice: (blob: Blob) => void;
   disabled?: boolean;
   onListeningStart?: () => void;
@@ -30,11 +30,26 @@ export default function ChatInput({
 }: ChatInputProps) {
   const [text, setText] = useState("");
 
+  const submitText = async () => {
+    const query = text.trim();
+    if (!query || disabled) return;
+    try {
+      setText("");
+      const result = onSendText(query);
+      if (result instanceof Promise) {
+        const ok = await result;
+        if (ok === false) {
+          setText(query);
+        }
+      }
+    } catch {
+      setText(query);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || disabled) return;
-    onSendText(text.trim());
-    setText("");
+    void submitText();
   };
 
   return (
@@ -80,12 +95,10 @@ export default function ChatInput({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (!text.trim() || disabled) return;
-                onSendText(text.trim());
-                setText("");
+                void submitText();
               }
             }}
-            placeholder="Ask a question about Machine Learning..."
+            placeholder="Ask a question in English, ಕನ್ನಡ, or हिन्दी..."
             disabled={disabled}
             className="max-h-32 min-h-[3.25rem] min-w-0 flex-1 resize-none bg-transparent px-2 py-2.5 text-[15px] leading-relaxed text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50"
           />
@@ -102,9 +115,11 @@ export default function ChatInput({
         </div>
       </form>
       <p className="mt-2 px-2 text-[11px] text-slate-400">
-        Try: <span className="text-slate-500">Explain overfitting</span>
+        Try: <span className="text-slate-500">What is gradient descent?</span>
         {" · "}
-        <span className="text-slate-500">What is gradient descent?</span>
+        <span className="text-slate-500">ಯಂತ್ರ ಕಲಿಕೆ ಎಂದರೇನು?</span>
+        {" · "}
+        <span className="text-slate-500">मशीन लर्निंग क्या है?</span>
       </p>
     </div>
   );

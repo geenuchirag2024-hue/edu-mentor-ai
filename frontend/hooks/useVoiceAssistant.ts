@@ -222,6 +222,17 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
       let fullAnswer = "";
       let sources: string[] | undefined;
 
+      // Render assistant message placeholder immediately so text appears in real-time
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+        },
+      ]);
+
       try {
         await streamChatMessage(
           {
@@ -237,11 +248,21 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
           {
             onToken: (token) => {
               fullAnswer += token;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, content: fullAnswer } : m
+                )
+              );
             },
 
             onComplete: (meta) => {
               setSessionId(meta.session_id);
               sources = meta.sources;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, sources: meta.sources } : m
+                )
+              );
               optionsRef.current.onCues?.(
                 meta.emotion as MascotEmotion | undefined,
                 meta.gesture as MascotGesture | undefined
@@ -250,33 +271,29 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
           },
           controller.signal
         );
+
         if (!fullAnswer.trim()) {
           const fallback = "I couldn't generate an answer in time. Try a shorter question.";
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: assistantId,
-              role: "assistant",
-              content: fallback,
-              timestamp: new Date(),
-            },
-          ]);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: fallback } : m
+            )
+          );
           setMascot("idle");
-          return;
+          return false;
         }
+
         window.clearTimeout(timer);
-        await playAnswerAudio(fullAnswer, controller.signal, assistantId, () => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: assistantId,
-              role: "assistant",
-              content: fullAnswer,
-              timestamp: new Date(),
-              sources,
-            },
-          ]);
-        });
+
+        // Check if generated answer or user language is Kannada (where Piper TTS has no voice)
+        const isKannada = /[\u0C80-\u0CFF]/.test(fullAnswer) || languageRef.current === "kn";
+        if (isKannada) {
+          setStatusMessage("Answer ready • Voice unavailable for Kannada");
+          setMascot("idle");
+        } else {
+          await playAnswerAudio(fullAnswer, controller.signal, assistantId);
+        }
+        return true;
       } catch (e) {
         const aborted = controller.signal.aborted;
         const message =
@@ -285,31 +302,21 @@ export function useVoiceAssistant(options: UseVoiceAssistantOptions = {}) {
             : e instanceof Error
               ? e.message
               : "Failed to send message";
-        setMessages((prev) => {
-          if (fullAnswer.trim()) {
-            return [
-              ...prev,
-              {
-                id: assistantId,
-                role: "assistant",
-                content: fullAnswer,
-                timestamp: new Date(),
-                sources,
-              },
-            ];
-          }
-          return [
-            ...prev,
-            {
-              id: assistantId,
-              role: "assistant",
-              content: message,
-              timestamp: new Date(),
-            },
-          ];
-        });
-        if (!aborted) setError(message);
-        setMascot("idle");
+
+        if (!fullAnswer.trim()) {
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+          if (!aborted) setError(message);
+          setMascot("idle");
+          return false;
+        } else {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: fullAnswer, sources } : m
+            )
+          );
+          setMascot("idle");
+          return true;
+        }
       } finally {
         window.clearTimeout(timer);
         if (abortRef.current === controller) abortRef.current = null;

@@ -8,7 +8,8 @@ import pytest
 from sqlalchemy import select
 
 from backend.api.routes.auth import hash_password, verify_password
-from backend.db.database import AsyncSessionLocal, Base, engine
+from backend.db.database import Base
+from backend.tests.conftest import TestSessionLocal as AsyncSessionLocal, test_engine as engine
 from backend.db.models import PasswordResetToken, User
 
 

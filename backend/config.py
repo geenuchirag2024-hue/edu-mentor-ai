@@ -24,9 +24,9 @@ class Settings(BaseSettings):
         "https://edu-mentor-lr3lcbzog-chethanchiragk.vercel.app"
     )
 
-    llm_model_path: str = str(PROJECT_ROOT / "data/models/qwen3.gguf")
+    llm_model_path: str = str(PROJECT_ROOT / "data/models/qwen2.5-3b.gguf")
     llm_fallback_model_path: str = str(PROJECT_ROOT / "data/models/qwen3.gguf")
-    llm_context_length: int = 1536
+    llm_context_length: int = 4096
     llm_max_tokens: int = 256
     llm_max_tokens_voice: int = 128
     llm_n_threads: int = 4

@@ -19,6 +19,8 @@ export interface StreamChatCallbacks {
     emotion?: string;
     gesture?: string;
     response_type?: string;
+    mentor_id?: string;
+    language?: string;
   }) => void;
 }
 
@@ -80,6 +82,8 @@ export async function streamChatMessage(
         emotion?: string;
         gesture?: string;
         response_type?: string;
+        mentor_id?: string;
+        language?: string;
       };
       if (data.token) callbacks.onToken(data.token);
       if (data.done && data.session_id) {
@@ -89,6 +93,8 @@ export async function streamChatMessage(
           emotion: data.emotion,
           gesture: data.gesture,
           response_type: data.response_type,
+          mentor_id: data.mentor_id,
+          language: data.language,
         });
       }
     }
@@ -104,6 +110,8 @@ export async function streamChatMessage(
         emotion?: string;
         gesture?: string;
         response_type?: string;
+        mentor_id?: string;
+        language?: string;
       };
       if (data.token) callbacks.onToken(data.token);
       if (data.done && data.session_id) {
@@ -113,6 +121,8 @@ export async function streamChatMessage(
           emotion: data.emotion,
           gesture: data.gesture,
           response_type: data.response_type,
+          mentor_id: data.mentor_id,
+          language: data.language,
         });
       }
     } catch {

@@ -48,6 +48,9 @@ def build_tutor_messages(
 ) -> list[dict[str, str]]:
     from backend.services.mentor_registry import get_mentor_prompt
     from backend.services.tutor_modes import hint_addendum, mode_addendum
+    from backend.utils.language_detect import resolve_effective_language
+
+    effective_lang = resolve_effective_language(user_message, language)
 
     system = get_mentor_prompt(mentor_id)
     system += mode_addendum(tutor_mode)
@@ -56,23 +59,18 @@ def build_tutor_messages(
         system += "\n" + extra_system
 
     # Multilingual response instruction
-    lang_code = (language or "en").lower().strip()
-    if lang_code.startswith("hi"):
+    if effective_lang == "hi":
         system += (
-            "\n\nLANGUAGE INSTRUCTION: उत्तर स्वाभाविक हिंदी भाषा में, देवनागरी लिपि में दें। "
-            "The student is communicating in Hindi (हिन्दी). Formulate your entire response in clear, "
-            "fluent, natural Hindi (using Devanagari script). Do not merely transliterate English; "
-            "provide genuine, grammatically coherent educational explanations while preserving technical clarity."
+            "\n\nLANGUAGE INSTRUCTION: आप Edu-Mentor AI शैक्षणिक सहायक हैं। उपयोगकर्ता ने हिंदी चुनी है, "
+            "इसलिए स्वाभाविक हिंदी में देवनागरी लिपि में उत्तर दें। प्रश्न का सीधा उत्तर दें और अनावश्यक रूप से अंग्रेज़ी में न बदलें।"
         )
-    elif lang_code.startswith("kn"):
+    elif effective_lang == "kn":
         system += (
-            "\n\nLANGUAGE INSTRUCTION: ಉತ್ತರವನ್ನು ಸಹಜ ಕನ್ನಡ ಭಾಷೆಯಲ್ಲಿ, ಕನ್ನಡ ಲಿಪಿಯಲ್ಲಿ ನೀಡಿ. "
-            "The student is communicating in Kannada (ಕನ್ನಡ). Formulate your entire response in clear, "
-            "friendly, natural Kannada (using Kannada script). Do not merely transliterate English into Kannada script; "
-            "provide genuine, educational explanations with natural grammar while preserving technical clarity."
+            "\n\nLANGUAGE INSTRUCTION: ನೀವು Edu-Mentor AI ಶಿಕ್ಷಣ ಸಹಾಯಕರು. ಬಳಕೆದಾರರು ಕನ್ನಡವನ್ನು ಆಯ್ಕೆ ಮಾಡಿದರೆ, "
+            "ಸಹಜ ಕನ್ನಡ ಭಾಷೆಯಲ್ಲಿ ಮತ್ತು ಕನ್ನಡ ಲಿಪಿಯಲ್ಲಿ ಉತ್ತರಿಸಿ. ಪ್ರಶ್ನೆಗೆ ನೇರವಾಗಿ ಉತ್ತರಿಸಿ. ಅನಗತ್ಯವಾಗಿ ಇಂಗ್ಲಿಷ್ಗೆ ಬದಲಾಯಿಸಬೇಡಿ."
         )
     else:
-        system += "\n\nLANGUAGE INSTRUCTION: Answer naturally in English."
+        system += "\n\nLANGUAGE INSTRUCTION: You are the Edu-Mentor AI educational assistant. Answer clearly and naturally in English."
 
     if for_voice:
         system += VOICE_TUTOR_ADDENDUM

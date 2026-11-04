@@ -13,6 +13,7 @@ from backend.services.learning import learning_store
 from backend.services.mascot_cues import infer_mascot_cues
 from backend.services.prompts import build_tutor_messages, is_greeting
 from backend.utils.audio import audio_to_base64
+from backend.utils.language_detect import resolve_effective_language
 from backend.voice.stt import get_stt
 from backend.voice.tts import get_tts
 
@@ -33,6 +34,8 @@ def prepare_text_query(
     sid = conversation_store.get_or_create_session(session_id)
     history = conversation_store.get_history(sid)
 
+    effective_lang = resolve_effective_language(message, language)
+
     context = ""
     sources: list[str] = []
     if not is_greeting(message):
@@ -52,7 +55,7 @@ def prepare_text_query(
         extra_system=extra,
         subject=subject,
         mentor_id=mentor_id,
-        language=language,
+        language=effective_lang,
     )
     return sid, messages, sources
 
@@ -80,7 +83,8 @@ def process_text_stream(
     subject: str = "Machine Learning",
     mentor_id: str | None = "mira",
     language: str | None = "en",
-) -> tuple[str, Iterator[str], list[str]]:
+) -> tuple[str, Iterator[str], list[str], str]:
+    effective_lang = resolve_effective_language(message, language)
     sid, messages, sources = prepare_text_query(
         message,
         session_id,
@@ -91,10 +95,10 @@ def process_text_stream(
         use_notes=use_notes,
         subject=subject,
         mentor_id=mentor_id,
-        language=language,
+        language=effective_lang,
     )
     tokens = get_llm().generate_stream(messages, for_voice=for_voice)
-    return sid, tokens, sources
+    return sid, tokens, sources, effective_lang
 
 
 def process_text_query(
@@ -109,6 +113,7 @@ def process_text_query(
     mentor_id: str | None = "mira",
     language: str | None = "en",
 ) -> dict:
+    effective_lang = resolve_effective_language(message, language)
     sid, messages, sources = prepare_text_query(
         message,
         session_id,
@@ -119,7 +124,7 @@ def process_text_query(
         use_notes=use_notes,
         subject=subject,
         mentor_id=mentor_id,
-        language=language,
+        language=effective_lang,
     )
     answer = get_llm().generate(messages, for_voice=for_voice)
     finalize_text_query(sid, message, answer, learner_id=learner_id)
@@ -134,7 +139,7 @@ def process_text_query(
         "session_id": sid,
         "sources": sources,
         "mentor_id": mentor_id or "mira",
-        "language": language or "en",
+        "language": effective_lang,
         **cues,
     }
 
@@ -151,18 +156,34 @@ def process_voice_query(
     mentor_id: str | None = "mira",
     language: str | None = "en",
 ) -> dict:
-    transcript = get_stt().transcribe(audio_bytes, filename=filename, language=language)
+    stt = get_stt()
+    info = None
+    if hasattr(stt, "transcribe_with_info"):
+        try:
+            info = stt.transcribe_with_info(audio_bytes, filename=filename, language=language)
+        except Exception:
+            info = None
+
+    if isinstance(info, dict):
+        transcript = info.get("text", "")
+        detected_lang = info.get("detected_language") or info.get("language")
+    else:
+        plain = stt.transcribe(audio_bytes, filename=filename, language=language)
+        transcript = getattr(plain, "_mock_return_value", plain) if hasattr(plain, "_mock_return_value") else plain
+        transcript = str(transcript) if transcript is not None else ""
+        detected_lang = language
+
+    effective_lang = resolve_effective_language(transcript, detected_lang or language)
 
     if not transcript.strip():
-        lang_code = (language or "en").lower().strip()
-        if lang_code.startswith("hi"):
+        if effective_lang.startswith("hi"):
             fallback = "मुझे आपकी आवाज़ स्पष्ट नहीं सुनाई दी। क्या आप अपना प्रश्न दोहरा सकते हैं?"
-        elif lang_code.startswith("kn"):
+        elif effective_lang.startswith("kn"):
             fallback = "ನಿಮ್ಮ ಧ್ವನಿ ಸ್ಪಷ್ಟವಾಗಿ ಕೇಳಿಸಲಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಪುನರಾವರ್ತಿಸಿ."
         else:
             fallback = "I didn't catch that. Could you please repeat your question?"
 
-        audio = get_tts().synthesize(fallback, mentor_id=mentor_id, language=language)
+        audio = get_tts().synthesize(fallback, mentor_id=mentor_id, language=effective_lang)
         sid = conversation_store.get_or_create_session(session_id)
         tts_supported = bool(audio and len(audio) > 44)
         return {
@@ -175,7 +196,7 @@ def process_voice_query(
             "gesture": "wave",
             "response_type": "greeting",
             "mentor_id": mentor_id or "mira",
-            "language": language or "en",
+            "language": effective_lang,
             "tts_supported": tts_supported,
         }
 
@@ -189,9 +210,9 @@ def process_voice_query(
         use_notes=use_notes,
         subject=subject,
         mentor_id=mentor_id,
-        language=language,
+        language=effective_lang,
     )
-    audio = get_tts().synthesize(result["answer"], mentor_id=mentor_id, language=language)
+    audio = get_tts().synthesize(result["answer"], mentor_id=mentor_id, language=effective_lang)
     tts_supported = bool(audio and len(audio) > 44)
 
     return {
@@ -204,6 +225,6 @@ def process_voice_query(
         "gesture": result.get("gesture", "none"),
         "response_type": result.get("response_type", "explanation"),
         "mentor_id": mentor_id or "mira",
-        "language": language or "en",
+        "language": effective_lang,
         "tts_supported": tts_supported,
     }

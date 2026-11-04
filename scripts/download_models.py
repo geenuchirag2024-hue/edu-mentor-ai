@@ -13,9 +13,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 MODELS_DIR = PROJECT_ROOT / "data" / "models"
 PIPER_DIR = MODELS_DIR / "piper"
 
-# Qwen3-4B-Instruct Q4_K_M — good default for 8-16GB RAM dev machines
-DEFAULT_QWEN_REPO = "DhruvalLabs/Qwen3-4B-Instruct-2507-GGUF"
-DEFAULT_QWEN_FILE = "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+# Qwen2.5-3B-Instruct Q4_K_M — excellent multilingual model for Kannada, Hindi & English
+DEFAULT_QWEN_REPO = "Qwen/Qwen2.5-3B-Instruct-GGUF"
+DEFAULT_QWEN_FILE = "qwen2.5-3b-instruct-q4_k_m.gguf"
 
 # Piper Voice Repositories (Hugging Face rhasspy/piper-voices)
 PIPER_VOICE_URLS = {
@@ -123,11 +123,11 @@ def main() -> int:
     print("\n=== Edu Mentor AI — Model Download ===\n")
 
     if not args.skip_qwen:
-        print("[1/4] Qwen 3 GGUF")
+        print("[1/4] Multilingual Qwen GGUF")
         results["qwen"] = download_qwen(
             args.qwen_repo,
             args.qwen_file,
-            MODELS_DIR / "qwen3.gguf",
+            MODELS_DIR / "qwen2.5-3b.gguf",
         )
     else:
         results["qwen"] = True

@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 
 export const SUPPORTED_LANGUAGES = [
+  { code: "auto", label: "Auto Detect", native: "Auto / ಸ್ವಯಂ / स्वतः", tts: true },
   { code: "en", label: "English", native: "English", tts: true },
-  { code: "hi", label: "Hindi", native: "हिन्दी", tts: true },
   { code: "kn", label: "Kannada", native: "ಕನ್ನಡ", tts: false },
+  { code: "hi", label: "Hindi", native: "हिन्दी", tts: true },
   { code: "ta", label: "Tamil", native: "தமிழ்", tts: false },
   { code: "te", label: "Telugu", native: "తెలుగు", tts: false },
   { code: "ml", label: "Malayalam", native: "മലയാളം", tts: false },
@@ -15,7 +16,7 @@ export const SUPPORTED_LANGUAGES = [
 ];
 
 export default function LanguageSelector() {
-  const [locale, setLocale] = useState("en");
+  const [locale, setLocale] = useState("auto");
 
   useEffect(() => {
     try {

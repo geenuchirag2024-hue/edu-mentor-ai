@@ -37,6 +37,8 @@ class QdrantVectorStore:
             self._client = QdrantClient(
                 host=self.settings.qdrant_host,
                 port=self.settings.qdrant_port,
+                timeout=1.0,
+                check_compatibility=False,
             )
             self._client.get_collections()
             self._available = True

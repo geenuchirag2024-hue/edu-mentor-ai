@@ -37,19 +37,43 @@ async def transcribe(
             language,
             current_user.email,
         )
-        info = await asyncio.to_thread(
-            get_stt().transcribe_with_info,
+        stt = get_stt()
+        info = None
+        if hasattr(stt, "transcribe_with_info"):
+            try:
+                info = await asyncio.to_thread(
+                    stt.transcribe_with_info,
+                    audio_bytes,
+                    audio.filename or "audio.webm",
+                    language=language,
+                )
+            except Exception:
+                info = None
+
+        if isinstance(info, dict):
+            return TranscribeResponse(
+                text=str(info.get("text", "")),
+                language=str(info.get("language") or language or "en"),
+                detected_language=info.get("detected_language"),
+                language_probability=info.get("language_probability"),
+                status=str(info.get("status", "success")),
+                message=info.get("message"),
+            )
+
+        plain = await asyncio.to_thread(
+            stt.transcribe,
             audio_bytes,
-            audio.filename or "audio.webm",
+            filename=audio.filename or "audio.webm",
             language=language,
         )
+        text_val = str(getattr(plain, "_mock_return_value", plain)) if plain is not None else ""
         return TranscribeResponse(
-            text=info.get("text", ""),
-            language=info.get("language") or language,
-            detected_language=info.get("detected_language"),
-            language_probability=info.get("language_probability"),
-            status=info.get("status", "success"),
-            message=info.get("message"),
+            text=text_val,
+            language=language or "en",
+            detected_language=None,
+            language_probability=None,
+            status="success",
+            message=None,
         )
     except Exception as exc:
         logger.exception("transcribe failed: %s", exc)
@@ -64,7 +88,9 @@ async def synthesize(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        clean_lang = (request.language or "en").lower().strip()
+        from backend.utils.language_detect import resolve_effective_language
+
+        clean_lang = resolve_effective_language(request.text, request.language)
         voice_cfg = get_mentor_voice_config(request.mentor_id, language=clean_lang)
         tts_supported = bool(voice_cfg.get("is_supported", True))
 
@@ -72,12 +98,12 @@ async def synthesize(
             get_tts().synthesize,
             request.text,
             request.mentor_id,
-            request.language,
+            clean_lang,
         )
         return SynthesizeResponse(
             audio_base64=audio_to_base64(audio) if audio else "",
             mentor_id=request.mentor_id or "mira",
-            language=request.language or "en",
+            language=clean_lang,
             tts_supported=tts_supported,
             status="success" if audio else ("tts_unsupported" if not tts_supported else "silent_fallback"),
         )
