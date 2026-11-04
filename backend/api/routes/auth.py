@@ -141,7 +141,7 @@ async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depend
     if user is not None:
         raw_token = secrets.token_urlsafe(32)
         token_hash = _hash_token(raw_token)
-        expires_at = datetime.utcnow() + timedelta(
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             minutes=settings.password_reset_token_expire_minutes
         )
 
@@ -191,7 +191,7 @@ async def validate_reset_token(body: ValidateResetTokenRequest, db: AsyncSession
             message="This password reset token has already been used. Please request a new one.",
         )
 
-    if record.expires_at < datetime.utcnow():
+    if record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         return ValidateResetTokenResponse(
             valid=False,
             message="This password reset link has expired. Please request a new one.",
@@ -224,7 +224,7 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
             detail="Invalid or already used password reset token. Please request a new one.",
         )
 
-    if record.expires_at < datetime.utcnow():
+    if record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         record.is_used = True
         await db.commit()
         raise HTTPException(

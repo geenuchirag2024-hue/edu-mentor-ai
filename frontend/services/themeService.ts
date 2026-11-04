@@ -47,3 +47,4 @@ export function initTheme(): void {
   const current = getStoredTheme();
   applyTheme(current);
 }
+

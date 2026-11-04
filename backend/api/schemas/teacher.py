@@ -73,3 +73,4 @@ class LeaveLetterOut(BaseModel):
     reviewed_by_name: str | None = None
     reviewed_at: datetime | None = None
     created_at: datetime
+

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 
@@ -430,7 +430,7 @@ async def review_leave_letter(
     letter.status = req.status
     letter.teacher_remarks = req.teacher_remarks
     letter.reviewed_by_id = current_teacher.id
-    letter.reviewed_at = datetime.utcnow()
+    letter.reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
     await db.refresh(letter)
 
