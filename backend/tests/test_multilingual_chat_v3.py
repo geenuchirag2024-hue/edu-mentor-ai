@@ -1,13 +1,11 @@
 """Comprehensive test suite for Phase 9: Multilingual Chat, STT, TTS and RAG."""
 
-import re
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from backend.rag.retriever import retrieve_context
-from backend.services.assistant_pipeline import prepare_text_query, process_text_query
+from backend.services.assistant_pipeline import prepare_text_query
 from backend.services.mentor_registry import get_mentor_voice_config
 from backend.utils.language_detect import detect_script_language, resolve_effective_language
 from backend.voice.tts import get_tts

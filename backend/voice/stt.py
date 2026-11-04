@@ -55,11 +55,6 @@ class STTService:
         language: str | None = None,
     ) -> str:
         """Backward-compatible transcription returning plain recognized text."""
-        import unittest.mock
-        patched = getattr(self, "_transcribe_file", None)
-        if isinstance(patched, unittest.mock.MagicMock):
-            res = patched(filename, language=language)
-            return res if isinstance(res, str) else str(res)
         info = self.transcribe_with_info(audio_bytes, filename=filename, language=language)
         return info.get("text", "")
 
@@ -70,7 +65,7 @@ class STTService:
         language: str | None = None,
     ) -> dict[str, Any]:
         """Perform multilingual transcription, returning text, detected language, and status."""
-        if not audio_bytes or len(audio_bytes) < 64:
+        if not audio_bytes or len(audio_bytes) < 12:
             return {
                 "text": "",
                 "language": language or "en",
@@ -96,7 +91,7 @@ class STTService:
 
         try:
             lang = language.lower().strip() if language else None
-            if lang in ("auto", "", "none"):
+            if not lang or lang in ("auto", "none"):
                 lang = None
             elif lang.startswith("hi"):
                 lang = "hi"
