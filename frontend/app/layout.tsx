@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import StudySessionTracker from "@/components/study/StudySessionTracker";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -20,7 +21,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={jakarta.className}>{children}</body>
+      <body className={jakarta.className}>
+        <StudySessionTracker />
+        {children}
+      </body>
     </html>
   );
 }

@@ -3,6 +3,7 @@
 import asyncio
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from backend.api.routes.auth import create_access_token, hash_password
@@ -10,10 +11,11 @@ from backend.db.database import Base, get_db
 from backend.db.models import User
 from backend.main import app
 
-# Shared in-memory test database
+# Shared in-memory test database with StaticPool so all async/sync contexts share the same schema
 test_engine = create_async_engine(
     "sqlite+aiosqlite:///:memory:",
     connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
     echo=False,
 )
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)

@@ -38,9 +38,9 @@ def run_lora_training(
         )
 
     try:
-        from datasets import Dataset
-        from peft import LoraConfig, get_peft_model
-        from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer
+        from datasets import Dataset  # type: ignore
+        from peft import LoraConfig, get_peft_model  # type: ignore
+        from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer  # type: ignore
     except ImportError as exc:
         raise ImportError(
             "Install training deps: pip install peft transformers datasets bitsandbytes accelerate"

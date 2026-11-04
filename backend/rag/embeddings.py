@@ -25,6 +25,7 @@ class EmbeddingService:
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         self._load()
+        assert self._model is not None
         return [vec.tolist() for vec in self._model.embed(texts)]
 
     def embed_query(self, text: str) -> list[float]:

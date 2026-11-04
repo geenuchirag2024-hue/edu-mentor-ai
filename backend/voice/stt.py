@@ -28,6 +28,9 @@ class STTService:
         except ImportError:
             WhisperModel = None
 
+        if WhisperModel is None:
+            raise RuntimeError("faster-whisper is not installed")
+
         self._model = WhisperModel(
             self.settings.whisper_model,
             device="cpu",

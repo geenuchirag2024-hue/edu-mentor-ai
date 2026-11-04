@@ -65,6 +65,8 @@ def _concat_wav(chunks: list[bytes]) -> bytes:
             if params is None:
                 params = src.getparams()
             frames.append(src.readframes(src.getnframes()))
+    if params is None:
+        return b""
     out = io.BytesIO()
     with wave.open(out, "wb") as dest:
         dest.setparams(params)

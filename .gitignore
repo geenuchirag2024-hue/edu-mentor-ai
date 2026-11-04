@@ -36,7 +36,12 @@ data/embeddings/*
 !data/embeddings/.gitkeep
 data/learner_profiles.json
 data/ml-content/processed/*
-!data/ml-content/processed/.gitkeep
+!data/ml-content/processed/.gitkeep
+data/user_documents/*
+!data/user_documents/.gitkeep
+data/teacher_resources/*
+!data/teacher_resources/.gitkeep
+*.tsbuildinfo
 
 # Logs
 *.log

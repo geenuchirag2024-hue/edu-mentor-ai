@@ -5,15 +5,21 @@ from __future__ import annotations
 import logging
 import uuid
 from functools import lru_cache
+from typing import TYPE_CHECKING, Any
 
-try:
+if TYPE_CHECKING:
     from qdrant_client import QdrantClient
     from qdrant_client.http import models as qmodels
     _QDRANT_CLIENT_AVAILABLE = True
-except Exception:
-    QdrantClient = None
-    qmodels = None
-    _QDRANT_CLIENT_AVAILABLE = False
+else:
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client.http import models as qmodels
+        _QDRANT_CLIENT_AVAILABLE = True
+    except Exception:
+        QdrantClient = None
+        qmodels = None
+        _QDRANT_CLIENT_AVAILABLE = False
 
 from backend.config import get_settings
 from backend.rag.local_store import LocalVectorStore
@@ -24,22 +30,23 @@ logger = logging.getLogger(__name__)
 class QdrantVectorStore:
     def __init__(self) -> None:
         self.settings = get_settings()
-        self._client: QdrantClient | None = None
+        self._client: Any = None
         self._available = False
 
     def _connect(self) -> None:
-        if not _QDRANT_CLIENT_AVAILABLE:
+        if not _QDRANT_CLIENT_AVAILABLE or QdrantClient is None:
             self._available = False
             return
         if self._client is not None:
             return
         try:
-            self._client = QdrantClient(
+            self._client = QdrantClient(  # type: ignore[misc]
                 host=self.settings.qdrant_host,
                 port=self.settings.qdrant_port,
-                timeout=1.0,
+                timeout=1,
                 check_compatibility=False,
             )
+            assert self._client is not None
             self._client.get_collections()
             self._available = True
             self._ensure_collection()
@@ -54,6 +61,7 @@ class QdrantVectorStore:
 
     def _ensure_collection(self) -> None:
         assert self._client is not None
+        assert qmodels is not None
         collections = [c.name for c in self._client.get_collections().collections]
         if self.settings.qdrant_collection not in collections:
             self._client.create_collection(
@@ -77,7 +85,7 @@ class QdrantVectorStore:
         metadata: list[dict],
     ) -> int:
         self._connect()
-        if not self._available or not self._client:
+        if not self._available or not self._client or qmodels is None:
             return 0
 
         points = []

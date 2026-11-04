@@ -48,7 +48,7 @@ def test_extraction_empty_and_corrupt_files(tmp_path: Path):
     valid_txt.write_text("Sample database transaction ACID properties.", encoding="utf-8")
     pages = extract_text_from_file(valid_txt)
     assert len(pages) == 1
-    assert "ACID" in pages[0]["text"]
+    assert "ACID" in str(pages[0]["text"])
     assert pages[0]["page"] == 1
 
 
@@ -70,9 +70,9 @@ def test_extraction_pdf(tmp_path: Path):
 
     pages = extract_text_from_pdf(pdf_path)
     assert len(pages) == 2
-    assert "Normalization" in pages[0]["text"]
+    assert "Normalization" in str(pages[0]["text"])
     assert pages[0]["page"] == 1
-    assert "Backpropagation" in pages[1]["text"]
+    assert "Backpropagation" in str(pages[1]["text"])
     assert pages[1]["page"] == 2
 
 

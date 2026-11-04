@@ -19,8 +19,8 @@ def export_gguf(
         raise FileNotFoundError(f"LoRA adapter not found at {adapter_dir}")
 
     try:
-        from peft import PeftModel
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from peft import PeftModel  # type: ignore
+        from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore
     except ImportError as exc:
         raise ImportError("Install: pip install peft transformers") from exc
 

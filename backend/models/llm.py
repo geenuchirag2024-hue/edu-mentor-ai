@@ -7,6 +7,7 @@ import threading
 from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from backend.config import get_settings
 
@@ -105,8 +106,8 @@ class LLMService:
 
         assert self._model is not None
         with self._gen_lock:
-            stream = self._model.create_chat_completion(
-                messages=messages,
+            stream: Any = self._model.create_chat_completion(
+                messages=messages,  # type: ignore[arg-type]
                 max_tokens=max_tokens,
                 temperature=0.6,
                 stream=True,
@@ -114,8 +115,8 @@ class LLMService:
 
             def _tokens() -> Iterator[str]:
                 for chunk in stream:
-                    delta = chunk["choices"][0].get("delta", {})
-                    content = delta.get("content")
+                    delta = chunk["choices"][0].get("delta", {}) if isinstance(chunk, dict) else {}
+                    content = delta.get("content") if isinstance(delta, dict) else None
                     if content:
                         yield content
 

@@ -27,7 +27,8 @@ def extract_text_from_pdf(pdf_path: Path) -> list[dict[str, str | int]]:
         for page_num in range(len(doc)):
             try:
                 page = doc[page_num]
-                text = page.get_text("text").strip()
+                raw_text = page.get_text("text")
+                text = raw_text.strip() if isinstance(raw_text, str) else str(raw_text).strip()
                 if text:
                     pages.append({"page": page_num + 1, "text": text})
             except Exception as page_exc:
@@ -59,4 +60,3 @@ def extract_text_from_file(file_path: Path) -> list[dict[str, str | int]]:
     else:
         logger.warning("Unsupported file extension %s for %s", ext, file_path)
         return []
-

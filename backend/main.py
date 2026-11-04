@@ -21,7 +21,19 @@ if str(_PROJECT_ROOT) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes import auth, chat, health, mentors, teacher, tutor, voice
+from backend.api.routes import (
+    analytics,
+    auth,
+    chat,
+    documents,
+    health,
+    mentors,
+    notifications,
+    resources,
+    teacher,
+    tutor,
+    voice,
+)
 from backend.config import get_settings
 
 settings = get_settings()
@@ -112,6 +124,10 @@ app.include_router(auth.router)
 app.include_router(tutor.router)
 app.include_router(teacher.router)
 app.include_router(mentors.router)
+app.include_router(documents.router)
+app.include_router(resources.router)
+app.include_router(notifications.router)
+app.include_router(analytics.router)
 
 
 @app.get("/")

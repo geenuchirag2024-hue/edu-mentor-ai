@@ -6,6 +6,7 @@ import logging
 import uuid
 from pathlib import Path
 from threading import Lock
+from typing import Any
 
 from backend.rag.chunking import chunk_text
 from backend.rag.ingestion import extract_text_from_pdf
@@ -38,7 +39,7 @@ class UserDocumentStore:
         if not chunks:
             raise ValueError("The document was empty after cleaning.")
 
-        vectors: list[list[float] | None] = [None] * len(chunks)
+        vectors: list[Any] = [None] * len(chunks)
         used_embeddings = False
         try:
             from backend.rag.embeddings import get_embeddings
