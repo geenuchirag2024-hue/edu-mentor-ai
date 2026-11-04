@@ -23,7 +23,10 @@ class STTService:
     def _load(self) -> None:
         if self._model is not None:
             return
-        from faster_whisper import WhisperModel
+        try:
+            from faster_whisper import WhisperModel  # type: ignore
+        except ImportError:
+            WhisperModel = None
 
         self._model = WhisperModel(
             self.settings.whisper_model,
