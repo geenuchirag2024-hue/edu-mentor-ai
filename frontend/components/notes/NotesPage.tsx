@@ -36,6 +36,7 @@ export default function NotesPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastQuestion, setLastQuestion] = useState<string>("");
 
   // Teacher Notes Library State
   const [resources, setResources] = useState<TeacherResourceItem[]>([]);
@@ -170,6 +171,7 @@ export default function NotesPage() {
       return;
     }
 
+    setLastQuestion(q);
     setBusy(true);
     setError(null);
     setMascotState("thinking");
@@ -480,6 +482,20 @@ export default function NotesPage() {
                     </div>
                   ))
                 )}
+                {/* Active LLM Generation Bubble */}
+                {busy && (
+                  <div className="flex flex-col items-start animate-pulse">
+                    <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-violet-200 bg-violet-50/90 px-4 py-3 text-sm shadow-sm text-violet-900">
+                      <div className="flex items-center gap-2.5">
+                        <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-600 border-t-transparent" />
+                        <span className="text-xs font-semibold">
+                          Mira is analyzing document passages & generating answer...
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div ref={chatEndRef} />
               </div>
 
@@ -538,7 +554,36 @@ export default function NotesPage() {
                     {busy ? "Thinking..." : "Ask Mentor"}
                   </button>
                 </div>
-                {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
+                {error && (
+                  <div className="mt-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 shadow-sm">
+                    <div className="flex items-start gap-2">
+                      <span className="text-base">⚠️</span>
+                      <div className="flex-1">
+                        <p className="font-semibold">Unable to process document query</p>
+                        <p className="mt-0.5 text-rose-700">{error}</p>
+                      </div>
+                    </div>
+                    {lastQuestion && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => ask(lastQuestion)}
+                          disabled={busy}
+                          className="rounded-lg bg-rose-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+                        >
+                          Retry Question
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setError(null)}
+                          className="rounded-lg border border-rose-300 bg-white px-3 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

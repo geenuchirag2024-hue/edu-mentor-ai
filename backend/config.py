@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     llm_context_length: int = 8192
     llm_max_tokens: int = 768
     llm_max_tokens_voice: int = 256
-    llm_n_threads: int = 4
+    llm_n_threads: int = 8
     llm_n_batch: int = 512
     llm_n_gpu_layers: int = 0  # set >0 or -1 if compiled with CUDA offloading
 

@@ -62,9 +62,13 @@ class LLMService:
                 )
             else:
                 n_gpu_layers = 0
+                import os
+                threads = getattr(self.settings, "llm_n_threads", 8) or 8
+                if threads <= 0:
+                    threads = min(os.cpu_count() or 4, 8)
                 logger.info(
                     "Using CPU inference (threads=%d, batch=%d, context=%d)",
-                    self.settings.llm_n_threads,
+                    threads,
                     self.settings.llm_n_batch,
                     self.settings.llm_context_length,
                 )
@@ -72,7 +76,7 @@ class LLMService:
             self._model = Llama(
                 model_path=str(model_path),
                 n_ctx=self.settings.llm_context_length,
-                n_threads=self.settings.llm_n_threads,
+                n_threads=threads,
                 n_batch=self.settings.llm_n_batch,
                 n_gpu_layers=n_gpu_layers,
                 verbose=False,
