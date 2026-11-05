@@ -2,7 +2,6 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import MiraStage from "@/components/mascot/MiraStage";
 import {
   askDocument,
   deleteDocument,
@@ -20,7 +19,193 @@ import {
   listResources,
   TeacherResourceItem,
 } from "@/services/resourceService";
-import type { MascotEmotion, MascotGesture, MascotState } from "@/types/voice";
+
+// Helper component to render code blocks with syntax styling and copy action
+function CodeBlock({ code, language }: { code: string; language: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div className="my-2.5 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900 shadow-md">
+      <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/80 px-3.5 py-1.5 text-xs text-slate-400">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-violet-400">
+          {language || "code"}
+        </span>
+        <button
+          type="button"
+          onClick={copy}
+          className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
+        >
+          {copied ? "✓ Copied" : "Copy Code"}
+        </button>
+      </div>
+      <pre className="overflow-x-auto p-3.5 text-xs font-mono text-slate-100 leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+// Inline token renderer for bold, inline code, and math symbols
+function renderInline(text: string) {
+  const tokens = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\$[^\$]+\$)/g);
+  return tokens.map((token, idx) => {
+    if (token.startsWith("`") && token.endsWith("`") && token.length > 2) {
+      return (
+        <code
+          key={idx}
+          className="rounded-md border border-violet-100 bg-violet-50/80 px-1.5 py-0.5 font-mono text-xs font-semibold text-violet-800"
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    }
+    if (token.startsWith("**") && token.endsWith("**") && token.length > 4) {
+      return (
+        <strong key={idx} className="font-semibold text-slate-900">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (token.startsWith("$") && token.endsWith("$") && token.length > 2) {
+      return (
+        <span
+          key={idx}
+          className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-medium text-slate-800"
+        >
+          {token.slice(1, -1)}
+        </span>
+      );
+    }
+    return token;
+  });
+}
+
+// Rich Markdown, list, and heading formatter
+function FormattedContent({ content }: { content: string }) {
+  const parts = content.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <div className="space-y-3 leading-relaxed">
+      {parts.map((part, pIdx) => {
+        if (part.startsWith("```") && part.endsWith("```")) {
+          const match = part.match(/^```(\w+)?\n?([\s\S]*?)```$/);
+          const lang = match?.[1] || "code";
+          const code = match?.[2] || part.slice(3, -3);
+          return <CodeBlock key={pIdx} code={code.trim()} language={lang} />;
+        }
+
+        return (
+          <div key={pIdx} className="space-y-2">
+            {part.split("\n\n").map((para, paraIdx) => {
+              const trimmed = para.trim();
+              if (!trimmed) return null;
+
+              const lines = trimmed.split("\n");
+              const isList = lines.every(
+                (l) =>
+                  l.trim().startsWith("- ") ||
+                  l.trim().startsWith("* ") ||
+                  /^\d+\.\s/.test(l.trim())
+              );
+
+              if (isList) {
+                return (
+                  <ul key={paraIdx} className="my-2 space-y-1.5 pl-1">
+                    {lines.map((line, lIdx) => {
+                      const cleanLine = line
+                        .replace(/^[-*]\s+|\d+\.\s+/, "")
+                        .trim();
+                      const isNum = /^\d+\.\s/.test(line.trim());
+                      return (
+                        <li key={lIdx} className="flex items-start gap-2.5 text-sm">
+                          <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[10px] font-bold text-violet-700">
+                            {isNum ? lIdx + 1 : "•"}
+                          </span>
+                          <span className="flex-1">{renderInline(cleanLine)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                );
+              }
+
+              if (trimmed.startsWith("### ")) {
+                return (
+                  <h4 key={paraIdx} className="pt-2 text-sm font-bold text-slate-900">
+                    {renderInline(trimmed.replace(/^###\s+/, ""))}
+                  </h4>
+                );
+              }
+              if (trimmed.startsWith("## ")) {
+                return (
+                  <h3
+                    key={paraIdx}
+                    className="pt-3 text-base font-bold text-slate-900 border-b border-slate-100 pb-1"
+                  >
+                    {renderInline(trimmed.replace(/^##\s+/, ""))}
+                  </h3>
+                );
+              }
+
+              return (
+                <p key={paraIdx} className="text-sm text-slate-800 leading-relaxed">
+                  {renderInline(trimmed)}
+                </p>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Copy Answer text button
+function CopyAnswerButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+      title="Copy answer to clipboard"
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+      <span>{copied ? "Copied" : "Copy"}</span>
+    </button>
+  );
+}
 
 export default function NotesPage() {
   const searchParams = useSearchParams();
@@ -37,6 +222,7 @@ export default function NotesPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastQuestion, setLastQuestion] = useState<string>("");
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   // Teacher Notes Library State
   const [resources, setResources] = useState<TeacherResourceItem[]>([]);
@@ -44,12 +230,8 @@ export default function NotesPage() {
   const [resourceSearch, setResourceSearch] = useState("");
   const [loadingResources, setLoadingResources] = useState(false);
 
-  // Mascot State
-  const [mascotState, setMascotState] = useState<MascotState>("idle");
-  const [emotion, setEmotion] = useState<MascotEmotion>("greeting");
-  const [gesture, setGesture] = useState<MascotGesture>("wave");
-
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Load documents and resources on mount
@@ -68,7 +250,17 @@ export default function NotesPage() {
   // Scroll chat to bottom when new messages arrive
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, busy]);
+
+  function handleScroll() {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 100);
+  }
+
+  function scrollToBottom() {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
 
   // Load student documents
   async function loadDocs() {
@@ -87,7 +279,10 @@ export default function NotesPage() {
   async function loadLibrary(subj?: string, search?: string) {
     setLoadingResources(true);
     try {
-      const data = await listResources(subj || resourceSubject, search ?? resourceSearch);
+      const data = await listResources(
+        subj || resourceSubject,
+        search ?? resourceSearch
+      );
       setResources(data);
     } catch {
       /* ignore */
@@ -121,12 +316,7 @@ export default function NotesPage() {
         setDocuments((prev) =>
           prev.map((d) => (d.id === updated.id ? updated : d))
         );
-        if (updated.status === "ready") {
-          setEmotion("happy");
-          setGesture("nod");
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        } else if (updated.status === "failed") {
-          setEmotion("thinking");
+        if (updated.status === "ready" || updated.status === "failed") {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         }
       } catch {
@@ -144,19 +334,15 @@ export default function NotesPage() {
     if (!file) return;
     setUploading(true);
     setError(null);
-    setMascotState("thinking");
     try {
       const res = await uploadDocument(file, uploadSubject);
       const newDoc = res.document;
       setDocuments((prev) => [newDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
       setSelectedDocId(newDoc.id);
-      setEmotion("happy");
-      setGesture("nod");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploading(false);
-      setMascotState("idle");
     }
   }
 
@@ -174,8 +360,6 @@ export default function NotesPage() {
     setLastQuestion(q);
     setBusy(true);
     setError(null);
-    setMascotState("thinking");
-    setEmotion("thinking");
 
     // Optimistically add user question to chat
     const tempUserMsg: DocumentMessageItem = {
@@ -198,14 +382,10 @@ export default function NotesPage() {
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
-      setEmotion("confident");
-      setGesture("point");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to answer question");
-      setEmotion("neutral");
     } finally {
       setBusy(false);
-      setMascotState("idle");
     }
   }
 
@@ -238,9 +418,9 @@ export default function NotesPage() {
   const currentDoc = documents.find((d) => d.id === selectedDocId);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-1 md:p-2">
+    <div className="flex h-full min-h-0 flex-col gap-3 p-1 md:p-2 overflow-hidden">
       {/* Top Navigation Tabs */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5 shrink-0">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -254,7 +434,13 @@ export default function NotesPage() {
             <span>📄</span>
             <span>My PDF Tutor</span>
             {documents.length > 0 && (
-              <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === "pdf" ? "bg-violet-700 text-white" : "bg-slate-100 text-slate-600"}`}>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  activeTab === "pdf"
+                    ? "bg-violet-700 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
                 {documents.length}
               </span>
             )}
@@ -275,234 +461,386 @@ export default function NotesPage() {
             <span>📚</span>
             <span>Teacher Notes Library</span>
             {resources.length > 0 && (
-              <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === "library" ? "bg-indigo-700 text-white" : "bg-slate-100 text-slate-600"}`}>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  activeTab === "library"
+                    ? "bg-indigo-700 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
                 {resources.length}
               </span>
             )}
           </button>
         </div>
 
-        <div className="hidden sm:block text-xs text-slate-400">
-          Fast Ingestion • Strict Grounding • Monotonic Latency Tracking
+        <div className="hidden sm:flex items-center gap-3 text-xs text-slate-400">
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Local Vector Retrieval
+          </span>
+          <span>•</span>
+          <span>Strict Page Grounding</span>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: MY PDF TUTOR */}
+      {/* TAB 1: MY PDF TUTOR (FULL-WIDTH EXPANDED RETRIEVAL WORKSPACE) */}
       {/* ========================================================================= */}
       {activeTab === "pdf" && (
-        <div className="flex flex-1 flex-col gap-4 lg:flex-row min-h-0">
-          {/* Left / Main Panel */}
-          <div className="flex flex-1 flex-col gap-4 min-w-0">
-            {/* Document Header & Upload Bar */}
-            <div className="glass-panel p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+        <div className="flex flex-1 flex-col gap-3 min-h-0 w-full overflow-hidden">
+          {/* TOP SECTION: Document Header & Controls */}
+          <div className="glass-panel p-4 shrink-0 shadow-xs">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
                   <h2 className="text-base font-bold text-slate-900">
                     PDF & Document Assistant
                   </h2>
-                  <p className="text-xs text-slate-500">
-                    Upload your notes or textbook PDF. Ask questions grounded strictly in your document.
-                  </p>
+                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700">
+                    RAG Workspace
+                  </span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <select
-                    value={uploadSubject}
-                    onChange={(e) => setUploadSubject(e.target.value)}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
-                  >
-                    <option value="General">Subject: General</option>
-                    <option value="Machine Learning">Machine Learning</option>
-                    <option value="DBMS">DBMS</option>
-                    <option value="Deep Learning">Deep Learning</option>
-                  </select>
-
-                  <label className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700">
-                    <input
-                      type="file"
-                      accept=".pdf,.txt,.md"
-                      className="hidden"
-                      onChange={(e) => void onFile(e.target.files?.[0])}
-                      disabled={uploading}
-                    />
-                    <span>{uploading ? "Uploading..." : "Upload New PDF"}</span>
-                  </label>
-                </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Upload your textbook, notes, or paper. Ask questions grounded strictly in document text with verifiable page citations.
+                </p>
               </div>
 
-              {/* Document Selector & Status Badge */}
-              {documents.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-500">Active Document:</span>
-                    <select
-                      value={selectedDocId ?? ""}
-                      onChange={(e) => setSelectedDocId(Number(e.target.value))}
-                      className="rounded-xl border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-800"
-                    >
-                      {documents.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.filename} ({d.page_count} pages)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              {/* Upload Controls */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={uploadSubject}
+                  onChange={(e) => setUploadSubject(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs focus:border-violet-500 focus:outline-none"
+                >
+                  <option value="General">Subject: General</option>
+                  <option value="Machine Learning">Machine Learning</option>
+                  <option value="DBMS">DBMS</option>
+                  <option value="Deep Learning">Deep Learning</option>
+                </select>
 
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700">
+                  <input
+                    type="file"
+                    accept=".pdf,.txt,.md"
+                    className="hidden"
+                    onChange={(e) => void onFile(e.target.files?.[0])}
+                    disabled={uploading}
+                  />
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <span>{uploading ? "Uploading..." : "Upload New PDF"}</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Active Document Selector, Status & Telemetry Strip */}
+            {documents.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 pt-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Active Document:
+                  </span>
+                  <select
+                    value={selectedDocId ?? ""}
+                    onChange={(e) => setSelectedDocId(Number(e.target.value))}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-800 shadow-xs focus:border-violet-500 focus:outline-none"
+                  >
+                    {documents.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.filename} ({d.page_count} pages)
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Document Telemetry Badges */}
                   {currentDoc && (
-                    <div className="flex items-center gap-2">
-                      {/* Status indicator */}
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                          currentDoc.status === "ready"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : currentDoc.status === "failed"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-amber-100 text-amber-800 animate-pulse"
-                        }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            currentDoc.status === "ready"
-                              ? "bg-emerald-500"
-                              : currentDoc.status === "failed"
-                              ? "bg-red-500"
-                              : "bg-amber-500"
-                          }`}
-                        />
-                        {currentDoc.status === "ready"
-                          ? `Ready (${currentDoc.page_count} pages, ${currentDoc.chunk_count} chunks)`
-                          : currentDoc.status === "extracting_text"
-                          ? "Extracting Text..."
-                          : currentDoc.status === "generating_embeddings"
-                          ? "Generating Vectors..."
-                          : currentDoc.status === "uploaded"
-                          ? "Queued for Indexing"
-                          : "Processing Failed"}
+                    <div className="hidden lg:flex items-center gap-1.5 text-xs">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        📄 <strong>{currentDoc.page_count}</strong> pages
                       </span>
-
-                      {currentDoc.status === "failed" && (
-                        <button
-                          type="button"
-                          onClick={() => handleRetry(currentDoc.id)}
-                          className="text-xs font-semibold text-violet-600 hover:underline"
-                        >
-                          Retry
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(currentDoc.id)}
-                        className="text-xs text-slate-400 hover:text-red-600"
-                        title="Delete document"
-                      >
-                        Delete
-                      </button>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        🧩 <strong>{currentDoc.chunk_count}</strong> chunks
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        💾 <strong>{Math.round(currentDoc.file_size / 1024)}</strong> KB
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                        🏷️ {currentDoc.subject}
+                      </span>
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* Error Alert */}
-              {currentDoc?.status === "failed" && currentDoc.error_message && (
-                <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
-                  ⚠️ {currentDoc.error_message}
-                </div>
-              )}
-            </div>
+                {currentDoc && (
+                  <div className="flex items-center gap-2">
+                    {/* Processing Status Badge */}
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                        currentDoc.status === "ready"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : currentDoc.status === "failed"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-amber-100 text-amber-800 animate-pulse"
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          currentDoc.status === "ready"
+                            ? "bg-emerald-500"
+                            : currentDoc.status === "failed"
+                            ? "bg-red-500"
+                            : "bg-amber-500"
+                        }`}
+                      />
+                      {currentDoc.status === "ready"
+                        ? `Ready (${currentDoc.page_count} pages, ${currentDoc.chunk_count} chunks)`
+                        : currentDoc.status === "extracting_text"
+                        ? "Extracting Text..."
+                        : currentDoc.status === "generating_embeddings"
+                        ? "Generating Embeddings..."
+                        : currentDoc.status === "uploaded"
+                        ? "Queued for Indexing"
+                        : "Processing Failed"}
+                    </span>
 
-            {/* Conversation History Thread */}
-            <div className="glass-panel flex flex-1 flex-col p-4 min-h-[320px]">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    {currentDoc.status === "failed" && (
+                      <button
+                        type="button"
+                        onClick={() => handleRetry(currentDoc.id)}
+                        className="text-xs font-semibold text-violet-600 hover:underline"
+                      >
+                        Retry
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(currentDoc.id)}
+                      className="text-xs font-medium text-slate-400 hover:text-red-600 transition"
+                      title="Delete document and chat history"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Error banner if document failed */}
+            {currentDoc?.status === "failed" && currentDoc.error_message && (
+              <div className="mt-2.5 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+                ⚠️ {currentDoc.error_message}
+              </div>
+            )}
+          </div>
+
+          {/* MIDDLE SECTION: Large Expanded Conversation Window */}
+          <div className="glass-panel relative flex flex-1 min-h-[460px] md:min-h-[520px] max-h-[72vh] flex-col overflow-hidden p-4 shadow-sm">
+            {/* Conversation Window Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Document Q&A Thread {currentDoc ? `· ${currentDoc.filename}` : ""}
                 </span>
                 {messages.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setMessages([])}
-                    className="text-xs font-medium text-slate-400 hover:text-slate-700"
-                  >
-                    Clear View
-                  </button>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                    {messages.length} message{messages.length === 1 ? "" : "s"}
+                  </span>
                 )}
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-                {messages.length === 0 ? (
-                  <div className="flex h-full flex-col items-center justify-center py-10 text-center">
-                    <span className="text-3xl">📖</span>
-                    <p className="mt-2 text-sm font-semibold text-slate-700">
-                      {currentDoc
-                        ? `Ask questions about "${currentDoc.filename}"`
-                        : "Upload a PDF or notes file to get started"}
-                    </p>
-                    <p className="mt-1 max-w-sm text-xs text-slate-400">
-                      Answers are grounded strictly in your document text with page references.
-                    </p>
+              {messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setMessages([])}
+                  className="text-xs font-medium text-slate-400 hover:text-slate-700 transition"
+                >
+                  Clear View
+                </button>
+              )}
+            </div>
+
+            {/* Scrollable Chat Area */}
+            <div
+              ref={chatContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 min-h-0 space-y-4 overflow-y-auto pr-2 scroll-smooth"
+            >
+              {messages.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-2xl text-violet-700 shadow-sm">
+                    📖
                   </div>
-                ) : (
-                  messages.map((m) => (
+                  <h3 className="mt-3 text-base font-bold text-slate-800">
+                    {currentDoc
+                      ? `Ready to explore "${currentDoc.filename}"`
+                      : "Upload a PDF or notes file to get started"}
+                  </h3>
+                  <p className="mt-1 max-w-md text-xs text-slate-500 leading-relaxed">
+                    {currentDoc
+                      ? "Ask any conceptual question, request a summary, or locate formulas. Answers are retrieved via local embeddings and strictly cited with exact page numbers."
+                      : "Upload lecture notes, textbooks, or research PDFs (up to 25MB) to ask grounded questions."}
+                  </p>
+
+                  {currentDoc && currentDoc.status === "ready" && (
+                    <div className="mt-5 grid max-w-lg grid-cols-1 gap-2 sm:grid-cols-2 text-left">
+                      {[
+                        {
+                          icon: "💡",
+                          title: "5 Key Takeaways",
+                          prompt: "Summarize this document in 5 key takeaways",
+                        },
+                        {
+                          icon: "🎯",
+                          title: "Core Concept",
+                          prompt: "Explain the core concept in simple terms",
+                        },
+                        {
+                          icon: "📝",
+                          title: "Exam Questions",
+                          prompt: "Generate 5 important exam questions with answers",
+                        },
+                        {
+                          icon: "🔍",
+                          title: "Practical Examples",
+                          prompt: "Give a real-world example from the text",
+                        },
+                      ].map((card) => (
+                        <button
+                          key={card.title}
+                          type="button"
+                          onClick={() => ask(card.prompt)}
+                          disabled={busy}
+                          className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white/80 p-3 text-xs transition hover:border-violet-300 hover:bg-violet-50/60 shadow-xs hover:shadow-sm"
+                        >
+                          <span className="text-base">{card.icon}</span>
+                          <div>
+                            <p className="font-bold text-slate-800">{card.title}</p>
+                            <p className="text-[11px] text-slate-500">{card.prompt}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                messages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`flex flex-col ${
+                      m.role === "user" ? "items-end" : "items-start"
+                    }`}
+                  >
                     <div
-                      key={m.id}
-                      className={`flex flex-col ${
-                        m.role === "user" ? "items-end" : "items-start"
+                      className={`max-w-[92%] rounded-2xl p-4 shadow-sm transition ${
+                        m.role === "user"
+                          ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-tr-xs"
+                          : "bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs shadow-xs"
                       }`}
                     >
-                      <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                          m.role === "user"
-                            ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-tr-sm"
-                            : "bg-white text-slate-800 border border-slate-100 rounded-tl-sm"
-                        }`}
-                      >
-                        <p className="whitespace-pre-wrap">{m.content}</p>
+                      {/* Assistant Header */}
+                      {m.role === "assistant" && (
+                        <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-1.5 text-xs">
+                          <span className="flex items-center gap-1.5 font-bold text-violet-700">
+                            <span>🤖</span>
+                            <span>Edu-Mentor Assistant</span>
+                          </span>
+                          <CopyAnswerButton text={m.content} />
+                        </div>
+                      )}
 
-                        {/* Source page badges for assistant */}
-                        {m.role === "assistant" && m.sources && m.sources.length > 0 && (
-                          <div className="mt-2.5 flex items-center gap-1.5 border-t border-slate-100 pt-2 text-[11px] text-slate-500 font-medium">
-                            <span className="font-semibold text-violet-700">📍 Cited Pages:</span>
-                            <div className="flex flex-wrap gap-1">
-                              {m.sources.map((p) => (
-                                <span
-                                  key={p}
-                                  className="rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-800"
-                                >
-                                  Page {p}
-                                </span>
-                              ))}
-                            </div>
+                      {/* Content Formatted */}
+                      {m.role === "assistant" ? (
+                        <FormattedContent content={m.content} />
+                      ) : (
+                        <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                          {m.content}
+                        </p>
+                      )}
+
+                      {/* Source Page Badges */}
+                      {m.role === "assistant" && m.sources && m.sources.length > 0 && (
+                        <div className="mt-3.5 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2.5 text-xs text-slate-600 font-medium">
+                          <span className="font-bold text-violet-700">
+                            📍 Cited Pages:
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {m.sources.map((p) => (
+                              <span
+                                key={p}
+                                className="rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-800"
+                              >
+                                Page {p}
+                              </span>
+                            ))}
                           </div>
-                        )}
-                      </div>
-                      <span className="mt-1 px-1 text-[10px] text-slate-400">
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
+                        </div>
+                      )}
                     </div>
-                  ))
-                )}
-                {/* Active LLM Generation Bubble */}
-                {busy && (
-                  <div className="flex flex-col items-start animate-pulse">
-                    <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-violet-200 bg-violet-50/90 px-4 py-3 text-sm shadow-sm text-violet-900">
-                      <div className="flex items-center gap-2.5">
-                        <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-600 border-t-transparent" />
-                        <span className="text-xs font-semibold">
-                          Mira is analyzing document passages & generating answer...
-                        </span>
+
+                    <span className="mt-1 px-1 text-[10px] text-slate-400">
+                      {new Date(m.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                ))
+              )}
+
+              {/* Active Thinking Bubble */}
+              {busy && (
+                <div className="flex flex-col items-start animate-pulse">
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-xs border border-violet-200 bg-violet-50/90 p-4 text-sm shadow-sm text-violet-900">
+                    <div className="flex items-center gap-2.5">
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-violet-600 border-t-transparent" />
+                      <div>
+                        <p className="font-semibold text-xs text-violet-900">
+                          Retrieving document passages & generating answer...
+                        </p>
+                        <p className="text-[11px] text-violet-700">
+                          Matching relevant chunks against your question with local embeddings.
+                        </p>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                <div ref={chatEndRef} />
-              </div>
+              <div ref={chatEndRef} />
+            </div>
 
+            {/* Scroll to Bottom Floating Button */}
+            {showScrollBottom && (
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="absolute bottom-28 right-6 z-10 flex items-center gap-1.5 rounded-full bg-violet-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg shadow-violet-600/30 transition hover:bg-violet-700 hover:scale-105"
+              >
+                <span>↓</span>
+                <span>Jump to latest</span>
+              </button>
+            )}
+
+            {/* BOTTOM SECTION: Suggested Prompts & Input Box */}
+            <div className="shrink-0 mt-2">
               {/* Quick Prompt Pills */}
               {currentDoc && currentDoc.status === "ready" && (
-                <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2">
-                  <span className="text-[11px] font-semibold text-slate-400">Prompts:</span>
+                <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2 pb-2">
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    Quick Prompts:
+                  </span>
                   {[
                     "Summarize this document in 5 key takeaways",
                     "Explain the core concept in simple terms",
@@ -514,7 +852,7 @@ export default function NotesPage() {
                       type="button"
                       onClick={() => ask(pill)}
                       disabled={busy}
-                      className="rounded-lg border border-slate-200 bg-white/80 px-2 py-1 text-[11px] text-slate-600 transition hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
+                      className="rounded-lg border border-slate-200 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800 disabled:opacity-50"
                     >
                       {pill}
                     </button>
@@ -523,111 +861,83 @@ export default function NotesPage() {
               )}
 
               {/* Question Input Box */}
-              <div className="mt-3 border-t border-slate-100 pt-3">
-                <div className="relative flex items-center">
-                  <textarea
-                    rows={2}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:bg-slate-50"
-                    placeholder={
-                      !currentDoc
-                        ? "Upload a document first..."
-                        : currentDoc.status !== "ready"
-                        ? "Document is indexing, please wait..."
-                        : "Ask questions about this PDF (Enter to send, Shift+Enter for new line)..."
+              <div className="relative flex items-center">
+                <textarea
+                  rows={2}
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 pr-28 text-sm text-slate-800 placeholder-slate-400 shadow-xs focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:bg-slate-50 leading-relaxed"
+                  placeholder={
+                    !currentDoc
+                      ? "Upload a document above to begin..."
+                      : currentDoc.status !== "ready"
+                      ? "Document is indexing, please wait..."
+                      : "Ask questions about this PDF (Enter to send, Shift+Enter for new line)..."
+                  }
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void ask();
                     }
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void ask();
-                      }
-                    }}
-                    disabled={busy || !currentDoc || currentDoc.status !== "ready"}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => ask()}
-                    disabled={busy || !question.trim() || !currentDoc || currentDoc.status !== "ready"}
-                    className="absolute right-2 bottom-2 rounded-xl bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-50"
+                  }}
+                  disabled={busy || !currentDoc || currentDoc.status !== "ready"}
+                />
+                <button
+                  type="button"
+                  onClick={() => ask()}
+                  disabled={
+                    busy ||
+                    !question.trim() ||
+                    !currentDoc ||
+                    currentDoc.status !== "ready"
+                  }
+                  className="absolute right-2.5 bottom-2.5 flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-50"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
                   >
-                    {busy ? "Thinking..." : "Ask Mentor"}
-                  </button>
-                </div>
-                {error && (
-                  <div className="mt-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 shadow-sm">
-                    <div className="flex items-start gap-2">
-                      <span className="text-base">⚠️</span>
-                      <div className="flex-1">
-                        <p className="font-semibold">Unable to process document query</p>
-                        <p className="mt-0.5 text-rose-700">{error}</p>
-                      </div>
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                  <span>{busy ? "Thinking..." : "Ask Question"}</span>
+                </button>
+              </div>
+
+              {/* Error Alert with Retry */}
+              {error && (
+                <div className="mt-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 shadow-sm">
+                  <div className="flex items-start gap-2">
+                    <span className="text-base">⚠️</span>
+                    <div className="flex-1">
+                      <p className="font-semibold">Unable to process document query</p>
+                      <p className="mt-0.5 text-rose-700">{error}</p>
                     </div>
-                    {lastQuestion && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => ask(lastQuestion)}
-                          disabled={busy}
-                          className="rounded-lg bg-rose-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
-                        >
-                          Retry Question
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setError(null)}
-                          className="rounded-lg border border-rose-300 bg-white px-3 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Mascot Stage */}
-          <aside className="w-full shrink-0 lg:w-72">
-            <div className="glass-panel sticky top-4 flex flex-col items-center p-4">
-              <MiraStage
-                state={mascotState}
-                emotion={emotion}
-                gesture={gesture}
-                size={200}
-              />
-              <div className="mt-3 text-center">
-                <p className="text-sm font-bold text-slate-800">Mira AI Tutor</p>
-                <p className="text-xs text-slate-500">
-                  {busy ? "Analyzing document pages..." : "Ready to explain your notes"}
-                </p>
-              </div>
-
-              {currentDoc && (
-                <div className="mt-4 w-full rounded-xl bg-slate-50 p-3 text-xs text-slate-600 space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Pages:</span>
-                    <span className="font-semibold text-slate-700">{currentDoc.page_count}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Chunks:</span>
-                    <span className="font-semibold text-slate-700">{currentDoc.chunk_count}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Size:</span>
-                    <span className="font-semibold text-slate-700">
-                      {Math.round(currentDoc.file_size / 1024)} KB
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Subject:</span>
-                    <span className="font-semibold text-violet-700">{currentDoc.subject}</span>
-                  </div>
+                  {lastQuestion && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => ask(lastQuestion)}
+                        disabled={busy}
+                        className="rounded-lg bg-rose-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+                      >
+                        Retry Question
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setError(null)}
+                        className="rounded-lg border border-rose-300 bg-white px-3 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-100"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          </aside>
+          </div>
         </div>
       )}
 
@@ -635,7 +945,7 @@ export default function NotesPage() {
       {/* TAB 2: TEACHER NOTES LIBRARY */}
       {/* ========================================================================= */}
       {activeTab === "library" && (
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto">
           <div className="glass-panel p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -720,9 +1030,26 @@ export default function NotesPage() {
                         )}
 
                         <div className="mt-3 border-t border-slate-100 pt-2 text-[11px] text-slate-400 space-y-0.5">
-                          <p>Uploaded by: <span className="font-semibold text-slate-700">{r.teacher_name}</span></p>
-                          <p>File: <span className="text-slate-600">{r.original_filename}</span></p>
-                          <p>Date: {new Date(r.created_at).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</p>
+                          <p>
+                            Uploaded by:{" "}
+                            <span className="font-semibold text-slate-700">
+                              {r.teacher_name}
+                            </span>
+                          </p>
+                          <p>
+                            File:{" "}
+                            <span className="text-slate-600">
+                              {r.original_filename}
+                            </span>
+                          </p>
+                          <p>
+                            Date:{" "}
+                            {new Date(r.created_at).toLocaleDateString([], {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </p>
                         </div>
                       </div>
 
@@ -732,7 +1059,14 @@ export default function NotesPage() {
                           onClick={() => downloadResource(r.id, r.original_filename)}
                           className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                             <polyline points="7 10 12 15 17 10" />
                             <line x1="12" y1="15" x2="12" y2="3" />

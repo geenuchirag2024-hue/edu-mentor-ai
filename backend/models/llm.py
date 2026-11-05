@@ -76,6 +76,7 @@ class LLMService:
             self._model = Llama(
                 model_path=str(model_path),
                 n_ctx=self.settings.llm_context_length,
+                # pyrefly: ignore[unbound-name]
                 n_threads=threads,
                 n_batch=self.settings.llm_n_batch,
                 n_gpu_layers=n_gpu_layers,
