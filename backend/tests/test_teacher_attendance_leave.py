@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from backend.main import app
 from backend.api.routes.auth import create_access_token
-from backend.db.database import AsyncSessionLocal
+from backend.tests.conftest import TestSessionLocal
 from backend.db.models import User
 
 
@@ -25,7 +25,7 @@ from backend.db.models import User
 async def test_attendance_and_leave_workflow():
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        async with AsyncSessionLocal() as db:
+        async with TestSessionLocal() as db:
             teacher_res = await db.execute(select(User).where(User.role == "teacher").limit(1))
             teacher_obj = teacher_res.scalar_one_or_none()
             student_res = await db.execute(select(User).where(User.role == "student").limit(1))

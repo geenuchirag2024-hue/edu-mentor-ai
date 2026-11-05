@@ -17,6 +17,7 @@ import json
 import logging
 import re
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -211,13 +212,13 @@ async def process_document_pipeline(
                         document_id, doc.chunk_count, doc.page_count)
 
         except Exception as exc:
-            logger.exception("Error processing document %d: %s", document_id, exc)
+            logger.exception("Error processing document %d", document_id)
             try:
                 doc.status = "failed"
-                doc.error_message = f"Processing failed: {str(exc)}"
+                doc.error_message = f"Processing failed: {exc}"
                 await db.commit()
             except Exception:
-                pass
+                logger.warning("Failed to commit failure status for document %d", document_id)
 
 
 def retrieve_document_context(
@@ -273,11 +274,22 @@ def retrieve_document_context(
 
     context_blocks: list[str] = []
     page_numbers: set[int] = set()
+    seen_texts: set[str] = set()
+    total_chars = 0
+    MAX_CONTEXT_CHARS = 10000  # ~2500 tokens budget
 
     for score, chunk in selected:
-        if score > 0.05 or len(selected) <= 2:
-            context_blocks.append(f"[Page {chunk.page_number}]\n{chunk.text_content}")
+        txt = chunk.text_content.strip()
+        norm = " ".join(txt.split())
+        if norm in seen_texts:
+            continue
+        if score > 0.05 or len(context_blocks) < 2:
+            if total_chars + len(txt) > MAX_CONTEXT_CHARS and context_blocks:
+                break
+            seen_texts.add(norm)
+            context_blocks.append(f"[Page {chunk.page_number}]\n{txt}")
             page_numbers.add(chunk.page_number)
+            total_chars += len(txt)
 
     retrieval_ms = int((time.perf_counter() - t_start) * 1000)
     sorted_pages = sorted(page_numbers)
@@ -342,6 +354,7 @@ async def answer_document_question(
     - Returns structured answer with page references and latency breakdown
     """
     t_total_start = time.perf_counter()
+    req_id = str(uuid.uuid4())[:8]
 
     # 1. Fetch document
     doc = await db.get(Document, document_id)
@@ -354,6 +367,17 @@ async def answer_document_question(
     if doc.status != "ready":
         raise ValueError(f"Document is not ready for questions yet (current status: {doc.status}).")
 
+    logger.info(
+        "[DocQ %s] User %d querying doc %d ('%s', pages=%d, lang=%s): '%s'",
+        req_id,
+        user_id,
+        document_id,
+        doc.filename,
+        doc.page_count,
+        language,
+        question[:80],
+    )
+
     # 2. Retrieve chunks
     chunks_query = select(DocumentChunk).where(DocumentChunk.document_id == document_id).order_by(DocumentChunk.chunk_index)
     res = await db.execute(chunks_query)
@@ -362,7 +386,6 @@ async def answer_document_question(
     context, pages, retrieval_ms = retrieve_document_context(document_id, chunks, question, top_k=5)
 
     if not context.strip():
-        # Document had no relevant text
         context = "No relevant text chunks found in document for this query."
         pages = []
 
@@ -386,12 +409,35 @@ async def answer_document_question(
         language=language,
     )
 
-    # 5. LLM Inference with monotonic timing
+    # 5. LLM Inference with monotonic timing and fallback
     t_gen_start = time.perf_counter()
     llm = get_llm()
-    answer = llm.generate(prompt_messages)
+    try:
+        answer = llm.generate(prompt_messages)
+        if not answer.strip():
+            answer = (
+                "I reviewed the relevant sections of your document "
+                f"(Pages: {', '.join(str(p) for p in pages) if pages else 'general'}), "
+                "but could not identify a direct answer to this specific question."
+            )
+    except Exception:
+        logger.exception("[DocQ %s] LLM generation error", req_id)
+        answer = (
+            f"Here are the relevant excerpts retrieved from your document (Pages: {', '.join(str(p) for p in pages) if pages else 'N/A'}):\n\n"
+            + (context[:1500] if context else "No context available.")
+        )
     generation_ms = int((time.perf_counter() - t_gen_start) * 1000)
     total_ms = int((time.perf_counter() - t_total_start) * 1000)
+
+    logger.info(
+        "[DocQ %s] Completed in %d ms (retrieval=%d ms, gen=%d ms, chunks=%d, pages=%s)",
+        req_id,
+        total_ms,
+        retrieval_ms,
+        generation_ms,
+        len(chunks),
+        pages,
+    )
 
     # 6. Save messages & logs
     user_msg = DocumentMessage(

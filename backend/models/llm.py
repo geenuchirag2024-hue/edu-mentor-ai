@@ -87,6 +87,56 @@ class LLMService:
             return self.settings.llm_max_tokens_voice
         return self.settings.llm_max_tokens
 
+    def _prepare_messages_for_context(
+        self, messages: list[dict[str, str]], max_tokens: int
+    ) -> list[dict[str, str]]:
+        """Ensure input prompt tokens strictly fit within the context window (n_ctx - max_tokens - 64).
+        Prevents 'Requested tokens exceed context window' crashes.
+        """
+        n_ctx = getattr(self.settings, "llm_context_length", 8192)
+        available_prompt_budget = max(512, n_ctx - max_tokens - 64)
+
+        def estimate_tokens(text: str) -> int:
+            return max(1, len(text) // 3)
+
+        total_est = sum(estimate_tokens(m.get("content", "")) for m in messages)
+        if total_est <= available_prompt_budget:
+            return messages
+
+        logger.warning(
+            "Prompt token estimate (%d) exceeds budget (%d). Truncating context safely.",
+            total_est,
+            available_prompt_budget,
+        )
+
+        system_msgs = [m for m in messages if m.get("role") == "system"]
+        non_system = [m for m in messages if m.get("role") != "system"]
+
+        sys_cost = sum(estimate_tokens(m.get("content", "")) for m in system_msgs)
+        remaining_budget = max(256, available_prompt_budget - sys_cost)
+
+        if non_system:
+            last_msg = dict(non_system[-1])
+            last_cost = estimate_tokens(last_msg.get("content", ""))
+            if last_cost > remaining_budget:
+                allowed_chars = remaining_budget * 3
+                content = last_msg.get("content", "")
+                last_msg["content"] = content[: allowed_chars - 120] + "\n\n[... Context truncated to fit context budget ...]\n"
+                return system_msgs + [last_msg]
+
+            fitted_non_system: list[dict[str, str]] = []
+            cur_cost = 0
+            for m in reversed(non_system):
+                cost = estimate_tokens(m.get("content", ""))
+                if cur_cost + cost <= remaining_budget:
+                    fitted_non_system.insert(0, m)
+                    cur_cost += cost
+                else:
+                    break
+            return system_msgs + fitted_non_system if fitted_non_system else system_msgs + [non_system[-1]]
+
+        return messages
+
     def generate(self, messages: list[dict[str, str]], *, for_voice: bool = False) -> str:
         return "".join(self.generate_stream(messages, for_voice=for_voice))
 
@@ -105,13 +155,36 @@ class LLMService:
             return
 
         assert self._model is not None
+        safe_messages = self._prepare_messages_for_context(messages, max_tokens)
         with self._gen_lock:
-            stream: Any = self._model.create_chat_completion(
-                messages=messages,  # type: ignore[arg-type]
-                max_tokens=max_tokens,
-                temperature=0.6,
-                stream=True,
-            )
+            try:
+                stream: Any = self._model.create_chat_completion(
+                    messages=safe_messages,  # type: ignore[arg-type]
+                    max_tokens=max_tokens,
+                    temperature=0.6,
+                    stream=True,
+                )
+            except Exception as exc:
+                err_msg = str(exc).lower()
+                if "context" in err_msg or "exceed" in err_msg or "token" in err_msg:
+                    logger.warning(
+                        "Llama-cpp context limit reached (%s). Applying emergency context compression.",
+                        exc,
+                    )
+                    emergency_messages = [m for m in safe_messages if m.get("role") == "system"]
+                    last_m = safe_messages[-1]
+                    emergency_messages.append({
+                        "role": last_m.get("role", "user"),
+                        "content": last_m.get("content", "")[:1200] + "\n[Answer concisely]",
+                    })
+                    stream = self._model.create_chat_completion(
+                        messages=emergency_messages,  # type: ignore[arg-type]
+                        max_tokens=max_tokens,
+                        temperature=0.6,
+                        stream=True,
+                    )
+                else:
+                    raise
 
             def _tokens() -> Iterator[str]:
                 for chunk in stream:

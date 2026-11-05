@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+import time
 import uuid
 from typing import Any
 
 from backend.models.llm import get_llm
 from backend.services.learning import detect_topics, learning_store
+
+logger = logging.getLogger(__name__)
 
 _QUIZ_SESSIONS: dict[str, dict[str, Any]] = {}
 
@@ -273,13 +277,29 @@ MOCK_BANK: dict[str, list[dict]] = {
 
 def _parse_json_payload(text: str) -> dict:
     cleaned = text.strip()
-    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
-    cleaned = re.sub(r"\s*```$", "", cleaned)
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
     start = cleaned.find("{")
     end = cleaned.rfind("}")
-    if start < 0 or end <= start:
-        raise ValueError("No JSON object in model output")
-    return json.loads(cleaned[start : end + 1])
+    if start >= 0 and end > start:
+        candidate = cleaned[start : end + 1]
+        try:
+            return json.loads(candidate)
+        except Exception:
+            sanitized = re.sub(r",\s*([}\]])", r"\1", candidate)
+            try:
+                return json.loads(sanitized)
+            except Exception:
+                pass
+
+    q_match = re.search(r'"questions"\s*:\s*(\[[^\]]+\])', cleaned, re.DOTALL)
+    if q_match:
+        try:
+            return {"questions": json.loads(q_match.group(1))}
+        except Exception:
+            pass
+
+    raise ValueError("No JSON object in model output")
 
 
 def _bank_questions(topic: str, n: int, subject: str = "Machine Learning") -> list[dict]:
@@ -325,20 +345,51 @@ def _bank_questions(topic: str, n: int, subject: str = "Machine Learning") -> li
 def _normalize_questions(raw: list, n: int) -> list[dict]:
     questions = []
     for i, q in enumerate(raw[:n]):
-        qtype = str(q.get("type") or "mcq").lower()
+        if not isinstance(q, dict):
+            continue
+        qtype = str(q.get("type") or "mcq").lower().strip()
         if qtype not in {"mcq", "true_false", "short"}:
             qtype = "mcq"
+
+        prompt_txt = str(q.get("prompt") or q.get("question") or "").strip()
+        if not prompt_txt:
+            continue
+
         options = q.get("options") or []
-        if qtype == "true_false" and not options:
+        if not isinstance(options, list):
+            options = []
+
+        ans = str(q.get("answer") or q.get("correct") or "").strip()
+        expl = str(q.get("explanation") or (f"Correct answer: {ans}" if ans else "Standard answer applies.")).strip()
+
+        if qtype == "true_false":
             options = ["True", "False"]
+            if ans.lower() in ("true", "t", "1"):
+                ans = "True"
+            elif ans.lower() in ("false", "f", "0"):
+                ans = "False"
+            else:
+                ans = "True"
+        elif qtype == "mcq":
+            opts = [str(o).strip() for o in options if str(o).strip()]
+            if ans and ans not in opts:
+                opts.insert(0, ans)
+            while len(opts) < 4:
+                opts.append(f"Option {chr(65 + len(opts))}")
+            options = opts[:4]
+            if not ans:
+                ans = options[0]
+        else:  # short
+            options = []
+
         questions.append(
             {
                 "id": str(q.get("id") or f"q{i + 1}"),
                 "type": qtype,
-                "prompt": str(q.get("prompt") or q.get("question") or "").strip(),
-                "options": [str(o) for o in options],
-                "answer": str(q.get("answer") or q.get("correct") or "").strip(),
-                "explanation": str(q.get("explanation") or "").strip(),
+                "prompt": prompt_txt,
+                "options": options,
+                "answer": ans,
+                "explanation": expl,
                 "subtopic": str(q.get("subtopic") or "General").strip(),
             }
         )
@@ -353,7 +404,7 @@ def generate_quiz(
     n_questions: int = 5,
     learner_id: str | None = None,
 ) -> dict:
-    n_questions = max(3, min(int(n_questions), 12))
+    n_questions = max(3, min(n_questions, 12))
     if learner_id:
         profile = learning_store.get_or_create(learner_id)
         difficulty = difficulty or profile.get("difficulty") or "medium"
@@ -395,7 +446,9 @@ Schema:
 }}
 Mix mcq, true_false, and one short answer. Keep language simple for students."""
 
+    t_start = time.perf_counter()
     questions: list[dict] = []
+    source = "llm"
     try:
         raw = get_llm().generate(
             [
@@ -408,14 +461,24 @@ Mix mcq, true_false, and one short answer. Keep language simple for students."""
         )
         payload = _parse_json_payload(raw)
         questions = _normalize_questions(payload.get("questions") or [], n_questions)
-    except Exception:
+    except Exception as exc:
+        logger.warning("LLM quiz generation failed (%s); serving verified curriculum bank.", exc)
         questions = []
 
-    if len(questions) < 3:
-        questions = _bank_questions(topic, n_questions, subject=subject)
-        for q in questions:
-            q["id"] = q.get("id") or str(uuid.uuid4())[:8]
+    if len(questions) < n_questions:
+        source = "bank" if not questions else "llm+bank"
+        bank_qs = _bank_questions(topic, n_questions, subject=subject)
+        existing_prompts = {q["prompt"].lower() for q in questions}
+        for bq in bank_qs:
+            if bq["prompt"].lower() not in existing_prompts:
+                questions.append(dict(bq))
+                existing_prompts.add(bq["prompt"].lower())
+            if len(questions) >= n_questions:
+                break
 
+    questions = questions[:n_questions]
+    for idx, q in enumerate(questions):
+        q["id"] = q.get("id") or f"q{idx + 1}"
 
     quiz_id = str(uuid.uuid4())
     public_questions = [
@@ -431,6 +494,16 @@ Mix mcq, true_false, and one short answer. Keep language simple for students."""
         "questions": questions,
         "hint_counts": {q["id"]: 0 for q in questions},
     }
+    duration_ms = int((time.perf_counter() - t_start) * 1000)
+    logger.info(
+        "Quiz ready: quiz_id=%s, subject=%s, topic=%s, count=%d, source=%s, duration=%dms",
+        quiz_id,
+        subject,
+        topic,
+        len(questions),
+        source,
+        duration_ms,
+    )
     return {
         "quiz_id": quiz_id,
         "subject": subject,
@@ -530,7 +603,7 @@ def quiz_hint(quiz_id: str, question_id: str) -> dict:
         raise KeyError("Unknown question_id")
 
     counts: dict[str, int] = session["hint_counts"]
-    counts[question_id] = int(counts.get(question_id) or 0) + 1
+    counts[question_id] = counts.get(question_id, 0) + 1
     level = min(counts[question_id], 3)
 
     if level >= 3:

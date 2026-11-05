@@ -26,6 +26,7 @@ class SynthesizeResponse(BaseModel):
     tts_supported: bool = True
     related_video: RelatedVideoInfo | None = None
     status: str = "success"
+    message: str | None = None
 
 
 class VoiceQueryResponse(BaseModel):
@@ -41,3 +42,5 @@ class VoiceQueryResponse(BaseModel):
     language: str = "en"
     tts_supported: bool = True
     related_video: RelatedVideoInfo | None = None
+    status: str = "success"
+    message: str | None = None

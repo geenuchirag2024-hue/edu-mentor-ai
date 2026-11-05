@@ -11,13 +11,19 @@ from backend.db.database import Base, get_db
 from backend.db.models import User
 from backend.main import app
 
-# Shared in-memory test database with StaticPool so all async/sync contexts share the same schema
-test_engine = create_async_engine(
-    "sqlite+aiosqlite:///:memory:",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-    echo=False,
-)
+from pathlib import Path
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from backend.config import PROJECT_ROOT
+
+_TEST_DB_FILE = PROJECT_ROOT / "data" / "test_suite.db"
+_SYNC_DB_URL = f"sqlite:///{_TEST_DB_FILE.as_posix()}"
+_ASYNC_DB_URL = f"sqlite+aiosqlite:///{_TEST_DB_FILE.as_posix()}"
+
+sync_engine = create_engine(_SYNC_DB_URL, connect_args={"check_same_thread": False})
+test_engine = create_async_engine(_ASYNC_DB_URL, connect_args={"check_same_thread": False}, echo=False)
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
 
 
@@ -30,13 +36,12 @@ app.dependency_overrides[get_db] = override_get_db
 
 
 @pytest.fixture(autouse=True)
-async def setup_test_db():
+def setup_test_db():
     """Reset schema before every test and seed student and teacher users."""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+    Base.metadata.drop_all(sync_engine)
+    Base.metadata.create_all(sync_engine)
 
-    async with TestSessionLocal() as session:
+    with Session(sync_engine) as session:
         student = User(
             id=1,
             full_name="Default Student",
@@ -52,7 +57,8 @@ async def setup_test_db():
             role="teacher",
         )
         session.add_all([student, teacher])
-        await session.commit()
+        session.commit()
+    sync_engine.dispose()
     yield
 
 

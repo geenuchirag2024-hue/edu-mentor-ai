@@ -100,12 +100,26 @@ async def synthesize(
             request.mentor_id,
             clean_lang,
         )
+        if clean_lang == "kn" and not audio:
+            synth_status = "model_required"
+            synth_msg = "Local Kannada TTS model required. Text response is preserved."
+        elif audio:
+            synth_status = "success"
+            synth_msg = None
+        elif not tts_supported:
+            synth_status = "tts_unsupported"
+            synth_msg = voice_cfg.get("unsupported_reason", "TTS not supported for this language.")
+        else:
+            synth_status = "silent_fallback"
+            synth_msg = None
+
         return SynthesizeResponse(
             audio_base64=audio_to_base64(audio) if audio else "",
             mentor_id=request.mentor_id or "mira",
             language=clean_lang,
             tts_supported=tts_supported,
-            status="success" if audio else ("tts_unsupported" if not tts_supported else "silent_fallback"),
+            status=synth_status,
+            message=synth_msg,
         )
     except Exception as exc:
         logger.exception("synthesize failed: %s", exc)

@@ -240,4 +240,6 @@ def process_voice_query(
         "language": effective_lang,
         "tts_supported": tts_supported,
         "related_video": result.get("related_video"),
+        "status": "success" if audio else ("model_required" if effective_lang == "kn" else "silent_fallback"),
+        "message": ("Local Kannada TTS model required. Text response is preserved." if (effective_lang == "kn" and not audio) else None),
     }

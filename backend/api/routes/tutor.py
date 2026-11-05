@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -25,6 +27,8 @@ from backend.services.learning import learning_store
 from backend.services.prompts import build_tutor_messages
 from backend.services.quiz import generate_quiz, grade_quiz, quiz_hint
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/tutor", tags=["tutor"])
 
 
@@ -33,16 +37,47 @@ async def quiz_generate(
     request: QuizGenerateRequest,
     current_user: User = Depends(get_current_user),
 ):
+    t_start = time.perf_counter()
+    req_id = str(uuid.uuid4())[:8]
     learner_id = request.learner_id or f"user_{current_user.id}"
-    result = await asyncio.to_thread(
-        generate_quiz,
-        subject=request.subject,
-        topic=request.topic,
-        difficulty=request.difficulty,
-        n_questions=request.n_questions,
-        learner_id=learner_id,
+    logger.info(
+        "[Quiz %s] User %s requested quiz: subject='%s', topic='%s', difficulty='%s', n=%d",
+        req_id,
+        current_user.id,
+        request.subject,
+        request.topic,
+        request.difficulty,
+        request.n_questions,
     )
-    return result
+    try:
+        result = await asyncio.to_thread(
+            generate_quiz,
+            subject=request.subject,
+            topic=request.topic,
+            difficulty=request.difficulty,
+            n_questions=request.n_questions,
+            learner_id=learner_id,
+        )
+        duration_ms = int((time.perf_counter() - t_start) * 1000)
+        logger.info(
+            "[Quiz %s] Generation completed successfully in %d ms (questions=%d)",
+            req_id,
+            duration_ms,
+            len(result.get("questions", [])),
+        )
+        return result
+    except Exception as exc:
+        duration_ms = int((time.perf_counter() - t_start) * 1000)
+        logger.exception(
+            "[Quiz %s] Generation failed after %d ms: %s",
+            req_id,
+            duration_ms,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Quiz generation error: {exc}",
+        ) from exc
 
 
 @router.post("/quiz/grade")

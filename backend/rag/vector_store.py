@@ -32,13 +32,15 @@ class QdrantVectorStore:
         self.settings = get_settings()
         self._client: Any = None
         self._available = False
+        self._connection_attempted = False
 
     def _connect(self) -> None:
         if not _QDRANT_CLIENT_AVAILABLE or QdrantClient is None:
             self._available = False
             return
-        if self._client is not None:
+        if self._client is not None or self._connection_attempted:
             return
+        self._connection_attempted = True
         try:
             self._client = QdrantClient(  # type: ignore[misc]
                 host=self.settings.qdrant_host,
@@ -91,7 +93,6 @@ class QdrantVectorStore:
         points = []
         for i, (chunk, vector, meta) in enumerate(zip(chunks, vectors, metadata)):
             cid = meta.get("chunk_id") or meta.get("id") or str(uuid.uuid4())
-            # Deterministic UUID for Qdrant point if cid is not a valid UUID string
             try:
                 point_id = str(uuid.UUID(str(cid)))
             except ValueError:
@@ -195,13 +196,12 @@ class VectorStore:
         self._local = LocalVectorStore()
         self._use_local = not self._qdrant.is_available
         if self._use_local:
-            logger.warning(
-                "Using local vector store (data/embeddings/local_rag.json). "
-                "Install Docker and run Qdrant for production RAG."
-            )
+            logger.info("Using local vector store (data/embeddings/local_rag.json).")
 
     @property
     def is_available(self) -> bool:
+        if self._use_local:
+            return self._local.is_available
         return self._qdrant.is_available or self._local.is_available
 
     @property
@@ -232,7 +232,6 @@ class VectorStore:
         if self._use_local:
             return self._local.search(query_vector, top_k=top_k, subject=subject)
         return self._qdrant.search(query_vector, top_k=top_k, subject=subject)
-
 
 
 @lru_cache

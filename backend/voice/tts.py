@@ -46,37 +46,57 @@ class TTSService:
             (model_path, voice_config, is_actual_target_model)
         """
         clean_id = normalize_mentor_id(mentor_id)
-        voice_cfg = get_mentor_voice_config(clean_id, language=language)
+        clean_lang = (language or "en").lower().strip()
+        if clean_lang.startswith("hi"):
+            clean_lang = "hi"
+        elif clean_lang.startswith("kn"):
+            clean_lang = "kn"
+        else:
+            clean_lang = "en"
+
+        voice_cfg = get_mentor_voice_config(clean_id, language=clean_lang)
+
+        # Kannada uses dedicated local engine interface
+        if clean_lang == "kn":
+            from backend.voice.kannada_tts import get_kannada_tts
+            kannada_engine = get_kannada_tts()
+            if kannada_engine.is_available() and kannada_engine.model_path:
+                return kannada_engine.model_path, voice_cfg, True
+            return Path(""), voice_cfg, False
+
         target_model = voice_cfg.get("voice_model", self.settings.piper_voice)
         fallback_model = voice_cfg.get("fallback_voice", "en_US-lessac-medium")
 
         base_dir = Path(self.settings.piper_model_dir)
 
         # 1. Check target model
-        target_path = base_dir / target_model / f"{target_model}.onnx"
-        if not target_path.exists():
+        target_path = base_dir / target_model / f"{target_model}.onnx" if target_model else Path("")
+        if target_path and not target_path.exists():
             alt_path = base_dir / target_model / "model.onnx"
             if alt_path.exists():
                 target_path = alt_path
 
-        if target_path.exists():
+        if target_path and target_path.exists():
             return target_path, voice_cfg, True
 
         # 2. Check fallback model
+        if not fallback_model:
+            return Path(""), voice_cfg, False
+
         fallback_path = base_dir / fallback_model / f"{fallback_model}.onnx"
         if not fallback_path.exists():
             alt_fallback = base_dir / fallback_model / "model.onnx"
             if alt_fallback.exists():
                 fallback_path = alt_fallback
 
-        cache_key = f"{clean_id}:{language}"
+        cache_key = f"{clean_id}:{clean_lang}"
         if cache_key not in self._reported_fallbacks and clean_id != "mira":
             self._reported_fallbacks.add(cache_key)
             logger.info(
                 "[TTS] Mentor '%s' (lang=%s) configured voice '%s' not installed at %s. "
                 "Using fallback '%s' with mentor voice parameter tuning.",
                 clean_id,
-                language,
+                clean_lang,
                 target_model,
                 target_path,
                 fallback_model,
@@ -234,6 +254,19 @@ class TTSService:
             clean_lang = "kn"
         else:
             clean_lang = "en"
+
+        # Dedicated Kannada offline engine routing
+        if clean_lang == "kn":
+            from backend.voice.kannada_tts import get_kannada_tts
+            kannada_engine = get_kannada_tts()
+            if kannada_engine.is_available():
+                return kannada_engine.synthesize(speech_text)
+            logger.info(
+                "[TTS] Kannada language requested but no local Kannada model installed in %s. "
+                "Returning empty audio while preserving exact Kannada text response.",
+                kannada_engine.model_dir,
+            )
+            return b""
 
         onnx_path, voice_cfg, _ = self.resolve_mentor_voice(clean_id, language=clean_lang)
 

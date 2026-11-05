@@ -31,28 +31,65 @@ class STTService:
         if WhisperModel is None:
             raise RuntimeError("faster-whisper is not installed")
 
+        try:
+            import ctranslate2
+            if ctranslate2.get_cuda_device_count() > 0:
+                self._model = WhisperModel(
+                    self.settings.whisper_model,
+                    device="cuda",
+                    compute_type="float16",
+                )
+                logger.info("Loaded Faster-Whisper on CUDA GPU: %s", self.settings.whisper_model)
+                return
+        except Exception as exc:
+            logger.warning("CUDA initialization for Faster-Whisper failed (%s); using CPU fallback.", exc)
+
         self._model = WhisperModel(
             self.settings.whisper_model,
             device="cpu",
             compute_type="int8",
         )
-        logger.info("Loaded Faster-Whisper multilingual model: %s", self.settings.whisper_model)
+        logger.info("Loaded Faster-Whisper multilingual model on CPU: %s", self.settings.whisper_model)
 
     def _transcribe_file(self, tmp_path: str, language: str | None = None) -> Any:
         self._load()
         assert self._model is not None
-        segments, info = self._model.transcribe(
-            tmp_path,
-            beam_size=1,
-            language=language,
-            vad_filter=False,
-            condition_on_previous_text=False,
-            without_timestamps=True,
-        )
-        text = " ".join(segment.text.strip() for segment in segments).strip()
-        detected_lang = getattr(info, "language", None)
-        prob = getattr(info, "language_probability", 0.0)
-        return text, detected_lang, prob
+
+        initial_prompt = None
+        if language == "kn":
+            initial_prompt = "ಕನ್ನಡ ಮಾತುಕತೆ, ಯಂತ್ರ ಕಲಿಕೆ, ದತ್ತಸಂಚಯ, ಪ್ರಶ್ನೆಗಳು ಮತ್ತು ವಿವರಣೆಗಳು."
+        elif language == "hi":
+            initial_prompt = "नमस्ते, यह मशीन लर्निंग और कंप्यूटर साइंस की कक्षा है।"
+
+        try:
+            segments, info = self._model.transcribe(
+                tmp_path,
+                beam_size=3 if language else 1,
+                language=language,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=400),
+                initial_prompt=initial_prompt,
+                condition_on_previous_text=False,
+                without_timestamps=True,
+            )
+            text = " ".join(segment.text.strip() for segment in segments).strip()
+            detected_lang = getattr(info, "language", None)
+            prob = getattr(info, "language_probability", 0.0)
+            return text, detected_lang, prob
+        except Exception as exc:
+            logger.warning("VAD transcribe failed (%s); retrying standard pass", exc)
+            segments, info = self._model.transcribe(
+                tmp_path,
+                beam_size=1,
+                language=language,
+                vad_filter=False,
+                condition_on_previous_text=False,
+                without_timestamps=True,
+            )
+            text = " ".join(segment.text.strip() for segment in segments).strip()
+            detected_lang = getattr(info, "language", None)
+            prob = getattr(info, "language_probability", 0.0)
+            return text, detected_lang, prob
 
     def transcribe(
         self,

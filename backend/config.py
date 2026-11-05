@@ -26,9 +26,9 @@ class Settings(BaseSettings):
 
     llm_model_path: str = str(PROJECT_ROOT / "data/models/qwen2.5-3b.gguf")
     llm_fallback_model_path: str = str(PROJECT_ROOT / "data/models/qwen3.gguf")
-    llm_context_length: int = 4096
-    llm_max_tokens: int = 256
-    llm_max_tokens_voice: int = 128
+    llm_context_length: int = 8192
+    llm_max_tokens: int = 768
+    llm_max_tokens_voice: int = 256
     llm_n_threads: int = 4
     llm_n_batch: int = 512
     llm_n_gpu_layers: int = 0  # set >0 or -1 if compiled with CUDA offloading
@@ -61,8 +61,8 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
 
     rag_chunk_size: int = 600
-    rag_chunk_overlap: int = 80
-    rag_top_k: int = 2
+    rag_chunk_overlap: int = 100
+    rag_top_k: int = 4
     rag_score_threshold: float = 0.65
 
     @property

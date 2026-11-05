@@ -162,7 +162,7 @@ def normalize_mentor_id(mentor_id: str | None) -> str:
     """Normalize mentor ID, defaulting to 'mira' for missing or invalid IDs."""
     if not mentor_id:
         return DEFAULT_MENTOR_ID
-    clean = str(mentor_id).lower().strip()
+    clean = mentor_id.lower().strip()
     return clean if clean in MENTOR_REGISTRY else DEFAULT_MENTOR_ID
 
 
@@ -189,7 +189,17 @@ def get_mentor_voice_config(mentor_id: str | None, language: str | None = "en") 
         clean_lang = "en"
 
     mentor_langs = MENTOR_LANGUAGE_VOICES.get(mid, MENTOR_LANGUAGE_VOICES[DEFAULT_MENTOR_ID])
-    return mentor_langs.get(clean_lang, mentor_langs["en"])
+    cfg = dict(mentor_langs.get(clean_lang, mentor_langs["en"]))
+    if clean_lang == "kn":
+        try:
+            from backend.voice.kannada_tts import get_kannada_tts
+            kannada_engine = get_kannada_tts()
+            cfg["is_supported"] = kannada_engine.is_available()
+            if not cfg["is_supported"]:
+                cfg["unsupported_reason"] = "Local Kannada TTS model required in data/models/kannada. Text response is preserved."
+        except Exception:
+            cfg["is_supported"] = False
+    return cfg
 
 
 SUPPORTED_LANGUAGES: dict[str, dict[str, Any]] = {
@@ -229,16 +239,16 @@ MENTOR_LANGUAGE_VOICES: dict[str, dict[str, dict[str, Any]]] = {
             "is_supported": True,
         },
         "kn": {
-            "tts_engine": "piper",
-            "voice_model": "en_US-lessac-medium",
-            "fallback_voice": "en_US-lessac-medium",
+            "tts_engine": "kannada_tts",
+            "voice_model": "kn_IN-local",
+            "fallback_voice": None,
             "language": "kn-IN",
             "speaking_rate": 1.0,
             "noise_scale": 0.667,
             "noise_w": 0.8,
-            "traits": "warm, friendly educator (Kannada text / fallback audio)",
+            "traits": "warm, friendly educator (Kannada text / offline engine)",
             "is_supported": False,
-            "unsupported_reason": "Piper TTS catalog lacks a pre-trained Kannada (kn_IN) model.",
+            "unsupported_reason": "Local Kannada TTS model required in data/models/kannada. Text response is preserved.",
         },
     },
     "arjun": {
@@ -256,7 +266,7 @@ MENTOR_LANGUAGE_VOICES: dict[str, dict[str, dict[str, Any]]] = {
         "hi": {
             "tts_engine": "piper",
             "voice_model": "hi_IN-rohan-medium",
-            "fallback_voice": "en_US-lessac-medium",
+            "fallback_voice": "hi_IN-priyamvada-medium",
             "language": "hi-IN",
             "speaking_rate": 0.95,
             "noise_scale": 0.600,
@@ -265,16 +275,16 @@ MENTOR_LANGUAGE_VOICES: dict[str, dict[str, dict[str, Any]]] = {
             "is_supported": True,
         },
         "kn": {
-            "tts_engine": "piper",
-            "voice_model": "en_US-ryan-medium",
-            "fallback_voice": "en_US-lessac-medium",
+            "tts_engine": "kannada_tts",
+            "voice_model": "kn_IN-local",
+            "fallback_voice": None,
             "language": "kn-IN",
             "speaking_rate": 0.94,
             "noise_scale": 0.600,
             "noise_w": 0.75,
-            "traits": "calm, practical educator (Kannada text / fallback audio)",
+            "traits": "calm, practical educator (Kannada text / offline engine)",
             "is_supported": False,
-            "unsupported_reason": "Piper TTS catalog lacks a pre-trained Kannada (kn_IN) model.",
+            "unsupported_reason": "Local Kannada TTS model required in data/models/kannada. Text response is preserved.",
         },
     },
     "tara": {
@@ -292,7 +302,7 @@ MENTOR_LANGUAGE_VOICES: dict[str, dict[str, dict[str, Any]]] = {
         "hi": {
             "tts_engine": "piper",
             "voice_model": "hi_IN-priyamvada-medium",
-            "fallback_voice": "en_US-lessac-medium",
+            "fallback_voice": "hi_IN-priyamvada-medium",
             "language": "hi-IN",
             "speaking_rate": 1.05,
             "noise_scale": 0.650,
@@ -301,16 +311,16 @@ MENTOR_LANGUAGE_VOICES: dict[str, dict[str, dict[str, Any]]] = {
             "is_supported": True,
         },
         "kn": {
-            "tts_engine": "piper",
-            "voice_model": "en_US-amy-medium",
-            "fallback_voice": "en_US-lessac-medium",
+            "tts_engine": "kannada_tts",
+            "voice_model": "kn_IN-local",
+            "fallback_voice": None,
             "language": "kn-IN",
             "speaking_rate": 1.04,
             "noise_scale": 0.650,
             "noise_w": 0.85,
-            "traits": "clear, composed educator (Kannada text / fallback audio)",
+            "traits": "clear, composed educator (Kannada text / offline engine)",
             "is_supported": False,
-            "unsupported_reason": "Piper TTS catalog lacks a pre-trained Kannada (kn_IN) model.",
+            "unsupported_reason": "Local Kannada TTS model required in data/models/kannada. Text response is preserved.",
         },
     },
     "kiran": {
@@ -328,7 +338,7 @@ MENTOR_LANGUAGE_VOICES: dict[str, dict[str, dict[str, Any]]] = {
         "hi": {
             "tts_engine": "piper",
             "voice_model": "hi_IN-pratham-medium",
-            "fallback_voice": "en_US-lessac-medium",
+            "fallback_voice": "hi_IN-priyamvada-medium",
             "language": "hi-IN",
             "speaking_rate": 0.98,
             "noise_scale": 0.680,
@@ -337,16 +347,16 @@ MENTOR_LANGUAGE_VOICES: dict[str, dict[str, dict[str, Any]]] = {
             "is_supported": True,
         },
         "kn": {
-            "tts_engine": "piper",
-            "voice_model": "en_US-danny-low",
-            "fallback_voice": "en_US-lessac-medium",
+            "tts_engine": "kannada_tts",
+            "voice_model": "kn_IN-local",
+            "fallback_voice": None,
             "language": "kn-IN",
             "speaking_rate": 0.98,
             "noise_scale": 0.680,
             "noise_w": 0.80,
-            "traits": "energetic, hands-on educator (Kannada text / fallback audio)",
+            "traits": "energetic, hands-on educator (Kannada text / offline engine)",
             "is_supported": False,
-            "unsupported_reason": "Piper TTS catalog lacks a pre-trained Kannada (kn_IN) model.",
+            "unsupported_reason": "Local Kannada TTS model required in data/models/kannada. Text response is preserved.",
         },
     },
 }

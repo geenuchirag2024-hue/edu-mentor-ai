@@ -88,18 +88,19 @@ def _preload_models() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        from backend.db import models  # noqa: F401
-        from backend.db.database import Base, engine
-
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        print("[Edu Mentor] [ok] Database initialized", flush=True)
-    except Exception as exc:
-        print(f"[Edu Mentor] [warn] Database init: {exc}", flush=True)
-
+    print(">>> LIFESPAN ENTERED", flush=True)
     import os
     if not os.environ.get("TESTING") and not os.environ.get("PYTEST_CURRENT_TEST"):
+        try:
+            from backend.db import models  # noqa: F401
+            from backend.db.database import Base, engine
+
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            print("[Edu Mentor] [ok] Database initialized", flush=True)
+        except Exception as exc:
+            print(f"[Edu Mentor] [warn] Database init: {exc}", flush=True)
+
         _preload_models()
     yield
 
