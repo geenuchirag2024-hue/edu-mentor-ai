@@ -99,6 +99,14 @@ export async function getDocumentHistory(
   return apiFetch<DocumentHistoryResponse>(`/api/documents/${id}/history`);
 }
 
+export async function clearDocumentHistory(id: number): Promise<void> {
+  const res = await apiRequest(`/api/documents/${id}/history`, { method: "DELETE" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(friendlyApiError(res.status, text));
+  }
+}
+
 export async function deleteDocument(id: number): Promise<void> {
   const res = await apiRequest(`/api/documents/${id}`, { method: "DELETE" });
   if (!res.ok) {

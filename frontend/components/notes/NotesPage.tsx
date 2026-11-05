@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   askDocument,
+  clearDocumentHistory,
   deleteDocument,
   DocumentAskResponse,
   DocumentItem,
@@ -220,9 +221,14 @@ export default function NotesPage() {
   const [uploadSubject, setUploadSubject] = useState("General");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastQuestion, setLastQuestion] = useState<string>("");
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  // Clear Chat Modal State
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearingChat, setClearingChat] = useState(false);
 
   // Teacher Notes Library State
   const [resources, setResources] = useState<TeacherResourceItem[]>([]);
@@ -230,6 +236,7 @@ export default function NotesPage() {
   const [resourceSearch, setResourceSearch] = useState("");
   const [loadingResources, setLoadingResources] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -291,14 +298,14 @@ export default function NotesPage() {
     }
   }
 
-  // Load chat history when selected document changes
+  // Load chat history when selected document changes (isolated per document)
   useEffect(() => {
     if (!selectedDocId) {
       setMessages([]);
       return;
     }
     getDocumentHistory(selectedDocId)
-      .then((hist) => setMessages(hist.messages))
+      .then((hist) => setMessages(hist.messages || []))
       .catch(() => setMessages([]));
   }, [selectedDocId]);
 
@@ -307,6 +314,7 @@ export default function NotesPage() {
     const activeDoc = documents.find((d) => d.id === selectedDocId);
     if (!activeDoc || activeDoc.status === "ready" || activeDoc.status === "failed") {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (activeDoc?.status === "ready") setUploadProgress(null);
       return;
     }
 
@@ -316,13 +324,18 @@ export default function NotesPage() {
         setDocuments((prev) =>
           prev.map((d) => (d.id === updated.id ? updated : d))
         );
-        if (updated.status === "ready" || updated.status === "failed") {
+        if (updated.status === "ready") {
+          setUploadProgress(null);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          loadDocs();
+        } else if (updated.status === "failed") {
+          setUploadProgress(null);
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         }
       } catch {
         /* ignore */
       }
-    }, 2500);
+    }, 2000);
 
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -334,15 +347,28 @@ export default function NotesPage() {
     if (!file) return;
     setUploading(true);
     setError(null);
+    setUploadProgress("Uploading PDF to server...");
     try {
       const res = await uploadDocument(file, uploadSubject);
       const newDoc = res.document;
+      
+      // Update document list and select the newly uploaded PDF
       setDocuments((prev) => [newDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
       setSelectedDocId(newDoc.id);
+      setMessages([]);
+
+      if (newDoc.status === "ready") {
+        setUploadProgress(null);
+        await loadDocs();
+      } else {
+        setUploadProgress("Extracting text and generating vectors...");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
+      setUploadProgress(null);
     } finally {
       setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -386,6 +412,22 @@ export default function NotesPage() {
       setError(e instanceof Error ? e.message : "Failed to answer question");
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Handle Clear Chat for the current document
+  async function handleClearChat() {
+    if (!selectedDocId) return;
+    setClearingChat(true);
+    setError(null);
+    try {
+      await clearDocumentHistory(selectedDocId);
+      setMessages([]);
+      setShowClearConfirm(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to clear conversation history");
+    } finally {
+      setClearingChat(false);
     }
   }
 
@@ -491,6 +533,7 @@ export default function NotesPage() {
         <div className="flex flex-1 flex-col gap-3 min-h-0 w-full overflow-hidden">
           {/* TOP SECTION: Document Header & Controls */}
           <div className="glass-panel p-4 shrink-0 shadow-xs">
+            {/* Heading & Subject Row */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2">
@@ -502,25 +545,57 @@ export default function NotesPage() {
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Upload your textbook, notes, or paper. Ask questions grounded strictly in document text with verifiable page citations.
+                  Upload textbooks, lecture notes, or research papers. Ask questions grounded strictly in document text with verifiable citations.
                 </p>
               </div>
 
-              {/* Upload Controls */}
+              {/* Subject Selector */}
               <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500">Subject:</span>
                 <select
                   value={uploadSubject}
                   onChange={(e) => setUploadSubject(e.target.value)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs focus:border-violet-500 focus:outline-none"
                 >
-                  <option value="General">Subject: General</option>
+                  <option value="General">General</option>
                   <option value="Machine Learning">Machine Learning</option>
                   <option value="DBMS">DBMS</option>
                   <option value="Deep Learning">Deep Learning</option>
                 </select>
+              </div>
+            </div>
 
-                <label className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700">
+            {/* UNIFIED DOCUMENT TOOLBAR: Active PDF Selector, + Upload PDF Button, Status & Actions */}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Active PDF Selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-600 whitespace-nowrap">
+                    Active Document:
+                  </span>
+                  {documents.length > 0 ? (
+                    <select
+                      value={selectedDocId ?? ""}
+                      onChange={(e) => setSelectedDocId(Number(e.target.value))}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-xs focus:border-violet-500 focus:outline-none"
+                    >
+                      {documents.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.filename} ({d.page_count} pages)
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-400 font-medium">
+                      No documents uploaded yet
+                    </span>
+                  )}
+                </div>
+
+                {/* RESTORED: Prominent + Upload PDF Button */}
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 hover:shadow active:scale-98">
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".pdf,.txt,.md"
                     className="hidden"
@@ -533,109 +608,108 @@ export default function NotesPage() {
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="2"
+                    strokeWidth="2.5"
                   >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
-                  <span>{uploading ? "Uploading..." : "Upload New PDF"}</span>
+                  <span>{uploading ? "Uploading..." : "+ Upload PDF"}</span>
                 </label>
-              </div>
-            </div>
 
-            {/* Active Document Selector, Status & Telemetry Strip */}
-            {documents.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 pt-3">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="text-xs font-semibold text-slate-500">
-                    Active Document:
-                  </span>
-                  <select
-                    value={selectedDocId ?? ""}
-                    onChange={(e) => setSelectedDocId(Number(e.target.value))}
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-800 shadow-xs focus:border-violet-500 focus:outline-none"
-                  >
-                    {documents.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.filename} ({d.page_count} pages)
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Document Telemetry Badges */}
-                  {currentDoc && (
-                    <div className="hidden lg:flex items-center gap-1.5 text-xs">
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                        📄 <strong>{currentDoc.page_count}</strong> pages
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                        🧩 <strong>{currentDoc.chunk_count}</strong> chunks
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                        💾 <strong>{Math.round(currentDoc.file_size / 1024)}</strong> KB
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
-                        🏷️ {currentDoc.subject}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {currentDoc && (
-                  <div className="flex items-center gap-2">
-                    {/* Processing Status Badge */}
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                        currentDoc.status === "ready"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : currentDoc.status === "failed"
-                          ? "bg-red-100 text-red-800"
-                          : "bg-amber-100 text-amber-800 animate-pulse"
-                      }`}
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          currentDoc.status === "ready"
-                            ? "bg-emerald-500"
-                            : currentDoc.status === "failed"
-                            ? "bg-red-500"
-                            : "bg-amber-500"
-                        }`}
-                      />
-                      {currentDoc.status === "ready"
-                        ? `Ready (${currentDoc.page_count} pages, ${currentDoc.chunk_count} chunks)`
-                        : currentDoc.status === "extracting_text"
-                        ? "Extracting Text..."
-                        : currentDoc.status === "generating_embeddings"
-                        ? "Generating Embeddings..."
-                        : currentDoc.status === "uploaded"
-                        ? "Queued for Indexing"
-                        : "Processing Failed"}
+                {/* Document Telemetry Badges */}
+                {currentDoc && currentDoc.status === "ready" && (
+                  <div className="hidden xl:flex items-center gap-1.5 text-xs">
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                      📄 <strong>{currentDoc.page_count}</strong> pages
                     </span>
-
-                    {currentDoc.status === "failed" && (
-                      <button
-                        type="button"
-                        onClick={() => handleRetry(currentDoc.id)}
-                        className="text-xs font-semibold text-violet-600 hover:underline"
-                      >
-                        Retry
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(currentDoc.id)}
-                      className="text-xs font-medium text-slate-400 hover:text-red-600 transition"
-                      title="Delete document and chat history"
-                    >
-                      Delete
-                    </button>
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                      🧩 <strong>{currentDoc.chunk_count}</strong> chunks
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                      💾 <strong>{Math.round(currentDoc.file_size / 1024)}</strong> KB
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                      🏷️ {currentDoc.subject}
+                    </span>
                   </div>
                 )}
               </div>
-            )}
+
+              {/* Status Badge & Document Delete Action */}
+              <div className="flex items-center gap-2.5">
+                {/* Upload / Indexing Status */}
+                {uploading ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-semibold text-violet-800 animate-pulse">
+                    <span className="h-1.5 w-1.5 rounded-full bg-violet-600 animate-ping" />
+                    {uploadProgress || "Uploading PDF..."}
+                  </span>
+                ) : currentDoc ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                      currentDoc.status === "ready"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : currentDoc.status === "failed"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-amber-100 text-amber-800 animate-pulse"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        currentDoc.status === "ready"
+                          ? "bg-emerald-500"
+                          : currentDoc.status === "failed"
+                          ? "bg-red-500"
+                          : "bg-amber-500"
+                      }`}
+                    />
+                    {currentDoc.status === "ready"
+                      ? `Ready (${currentDoc.page_count} pages, ${currentDoc.chunk_count} chunks)`
+                      : currentDoc.status === "extracting_text"
+                      ? "Extracting Text & Chunking..."
+                      : currentDoc.status === "generating_embeddings"
+                      ? "Generating Embeddings..."
+                      : currentDoc.status === "uploaded"
+                      ? "Queued for Indexing..."
+                      : "Processing Failed"}
+                  </span>
+                ) : null}
+
+                {/* Retry action if failed */}
+                {currentDoc?.status === "failed" && (
+                  <button
+                    type="button"
+                    onClick={() => handleRetry(currentDoc.id)}
+                    className="text-xs font-semibold text-violet-600 hover:underline"
+                  >
+                    Retry
+                  </button>
+                )}
+
+                {/* Delete Document Option */}
+                {currentDoc && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(currentDoc.id)}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
+                    title="Delete document and index permanently"
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    <span>Delete</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* Error banner if document failed */}
             {currentDoc?.status === "failed" && currentDoc.error_message && (
@@ -647,10 +721,10 @@ export default function NotesPage() {
 
           {/* MIDDLE SECTION: Large Expanded Conversation Window */}
           <div className="glass-panel relative flex flex-1 min-h-[460px] md:min-h-[520px] max-h-[72vh] flex-col overflow-hidden p-4 shadow-sm">
-            {/* Conversation Window Header */}
+            {/* Conversation Window Header with Title & Clear Chat Action */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
                   Document Q&A Thread {currentDoc ? `· ${currentDoc.filename}` : ""}
                 </span>
                 {messages.length > 0 && (
@@ -660,13 +734,30 @@ export default function NotesPage() {
                 )}
               </div>
 
-              {messages.length > 0 && (
+              {/* Clear Chat Button */}
+              {currentDoc && (
                 <button
                   type="button"
-                  onClick={() => setMessages([])}
-                  className="text-xs font-medium text-slate-400 hover:text-slate-700 transition"
+                  onClick={() => setShowClearConfirm(true)}
+                  disabled={messages.length === 0 || busy}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-700 active:scale-98"
+                  title="Clear conversation history for this document"
                 >
-                  Clear View
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                  <span>Clear Chat</span>
                 </button>
               )}
             </div>
@@ -936,6 +1027,59 @@ export default function NotesPage() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Chat Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Clear Conversation</h4>
+                <p className="text-xs text-slate-500 truncate max-w-[220px]">
+                  {currentDoc?.filename}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to clear this PDF conversation? Your document, extracted text, chunks, and index will remain completely intact.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(false)}
+                disabled={clearingChat}
+                className="rounded-xl border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleClearChat}
+                disabled={clearingChat}
+                className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50 transition"
+              >
+                {clearingChat ? "Clearing..." : "Clear Chat"}
+              </button>
             </div>
           </div>
         </div>

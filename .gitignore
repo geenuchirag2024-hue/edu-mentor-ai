@@ -37,6 +37,9 @@ data/embeddings/*
 data/learner_profiles.json
 data/ml-content/processed/*
 !data/ml-content/processed/.gitkeep
+data/ml-content/raw/*
+!data/ml-content/raw/.gitkeep
+!data/ml-content/processed/.gitkeep
 
 data/user_documents/
 !data/user_documents/.gitkeep

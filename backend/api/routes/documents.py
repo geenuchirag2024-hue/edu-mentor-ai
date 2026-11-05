@@ -16,7 +16,7 @@ from pathlib import Path
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, status, UploadFile
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.deps import get_current_user
@@ -233,6 +233,35 @@ async def get_document_history(
         filename=doc.filename,
         messages=messages_out,
     )
+
+
+@router.delete("/{document_id}/history")
+async def clear_document_history(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Clear chat conversation history for a specific document without deleting the document or its index."""
+    doc = await db.get(Document, document_id)
+    if not doc or doc.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    delete_stmt = (
+        delete(DocumentMessage)
+        .where(
+            DocumentMessage.document_id == document_id,
+            DocumentMessage.user_id == current_user.id,
+        )
+    )
+    await db.execute(delete_stmt)
+    await db.commit()
+
+    logger.info("Cleared chat history for document %d (user %d)", document_id, current_user.id)
+    return {
+        "status": "success",
+        "message": f"Conversation history for '{doc.filename}' cleared successfully.",
+        "document_id": document_id,
+    }
 
 
 @router.delete("/{document_id}")
